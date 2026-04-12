@@ -1,0 +1,6 @@
+#!/bin/bash
+# Example pre-backup hook
+echo "$(date) Pre-backup hook started" >> /var/log/backup-hooks.log
+# Add custom actions: e.g., stop non-critical services, flush caches, etc.
+# Exit 0 to continue even if hook fails (script treats as non-fatal)
+exit 0
