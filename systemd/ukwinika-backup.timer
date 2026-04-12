@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily UKwinika Backup Timer
+Requires=ukwinika-backup.service
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=30min
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
