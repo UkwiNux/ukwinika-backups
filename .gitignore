@@ -1,0 +1,17 @@
+# Secrets & sensitive files
+*.secrets
+ukwinika-backup.conf
+*.env
+
+# Temporary files
+*.tmp
+/temp_*
+/*.gpg
+
+# Logs (do not commit live logs)
+*.log
+
+# Editor files
+.vscode/
+.idea/
+*.swp
