@@ -79,6 +79,7 @@ ukwinika-backups/
 7. **Enable Daily Automation**
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
+   sudo systemctl status ukwinika-backup.timer
    ```
 
 ## Usage Examples
