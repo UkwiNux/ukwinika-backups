@@ -18,6 +18,8 @@
 - Systemd timers + logrotate ready
 
 ## Repository Structure
+```bash
+ukwinika-backups/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
@@ -36,6 +38,7 @@
 │   ├── pre_backup_hook.sh.example
 │   └── post_backup_hook.sh.example
 └── CONTRIBUTING.md                       # Optional but recommended
+```
 
 ## Full Installation & Setup (Step-by-Step)
 
