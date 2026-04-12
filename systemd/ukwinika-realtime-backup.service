@@ -1,0 +1,11 @@
+[Unit]
+Description=UKwinika Real-Time Backup Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/enhanced_automated_backups.sh real-time
+Restart=always
+RestartSec=10
+Nice=19
+User=root
