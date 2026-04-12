@@ -1,0 +1,5 @@
+#!/bin/bash
+# Example post-backup hook
+echo "$(date) Post-backup hook started" >> /var/log/backup-hooks.log
+# e.g., replicate to offsite, notify monitoring system, run borg check, etc.
+exit 0
