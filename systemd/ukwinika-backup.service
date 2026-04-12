@@ -1,0 +1,14 @@
+[Unit]
+Description=UKwinika Enhanced Backup Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/enhanced_automated_backups.sh backup incremental borg
+EnvironmentFile=-/etc/ukwinika-backup.env
+User=root
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
