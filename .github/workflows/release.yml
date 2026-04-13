@@ -1,5 +1,3 @@
-
-```yaml
 name: Create Release Tarball
 
 on:
