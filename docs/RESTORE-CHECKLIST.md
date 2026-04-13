@@ -17,6 +17,6 @@
 ### 3. Run Restore in Drill Mode (Recommended)
 ```bash
 sudo enhanced_automated_backups.sh restore drill borg <archive_name>
+```
 
-
-Note: Files will be restored to /tmp/restore_drill_<timestamp>
+Note: Files will be restored to: `/tmp/restore_drill_<timestamp>`
