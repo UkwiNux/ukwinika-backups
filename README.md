@@ -151,5 +151,5 @@ Copy the script to:
 - Borg health: `sudo borg check /UKwinikaBackup/borg_repo`
 - Common issues: missing dependencies, passphrase errors, insufficient permissions
 
-**A backup is only as good as its last successful restore.**
+**ADVICE: A Backup is only as Good as its last Successful Restore.**
 ```
