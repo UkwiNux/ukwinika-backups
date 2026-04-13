@@ -131,4 +131,25 @@ Copy the script to:
 
 - **Live restore** (emergency)  
   `sudo enhanced_automated_backups.sh restore full borg`
+
+- **View logs**  
+  `tail -f /var/log/UKwinikaBackup.log`
+
+## Scheduling & Automation
+- Daily backups via `ukwinika-backup.timer` (runs at 02:00 with random delay)
+- Real-time daemon via `ukwinika-realtime-backup.service`
+- Log rotation handled automatically
+
+## Security & Best Practices
+- Use Borg native `repokey-aes256` encryption.
+- Replicate Borg repo to S3 with **Object Lock** (Compliance mode) for immutability.
+- Run monthly restore drills (see `docs/RESTORE-CHECKLIST.md`).
+- Never commit passphrases or config files containing secrets.
+
+## Troubleshooting
+- Check `/var/log/UKwinikaBackup.log` and `_audit.log`
+- Borg health: `sudo borg check /UKwinikaBackup/borg_repo`
+- Common issues: missing dependencies, passphrase errors, insufficient permissions
+
+**A backup is only as good as its last successful restore.**
 ```
