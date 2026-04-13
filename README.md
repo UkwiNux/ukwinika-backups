@@ -40,13 +40,14 @@ ukwinika-backups/
 └── CONTRIBUTING.md                       # Optional but recommended
 ```
 
-## Full Installation & Setup (Step-by-Step)
+## Full Installation & Setup (Step-by-Step Instructions for Using the Backup Script)
 
-1. **Clone the Repository**
+1. **Initial Setup**
+   Copy the script to:
    ```bash
-   git clone https://github.com/yourusername/ukwinika-backups.git
-   cd ukwinika-backups
-   sudo install -m 700 enhanced_automated_backups.sh /usr/local/bin/
+   /usr/local/bin/enhanced_automated_backups.sh
+   and run chmod 700
+   sudo chmod 700 /usr/local/bin/enhanced_automated_backups.sh 
    ```
 
 2. **Install the Main Script**
