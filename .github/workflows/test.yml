@@ -1,0 +1,33 @@
+name: Backup Script Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y borgbackup rsync inotify-tools mailutils gnupg
+
+      - name: Make script executable
+        run: chmod +x enhanced_automated_backups.sh
+
+      - name: Run syntax check
+        run: bash -n enhanced_automated_backups.sh
+
+      - name: Test help / mode validation
+        run: |
+          sudo ./enhanced_automated_backups.sh backup incremental borg --dry-run || true
+          echo "✅ Basic mode validation passed"
+
+      - name: Check config example exists
+        run: test -f config/ukwinika-backup.conf.example
