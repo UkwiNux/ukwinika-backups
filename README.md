@@ -23,7 +23,8 @@ ukwinika-backups/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
-├── enhanced_automated_backups.sh          # Main production script
+├── Makefile                  
+├── enhanced_automated_backups.sh       # Main production script
 ├── config/
 │   └── ukwinika-backup.conf.example
 ├── systemd/
@@ -37,7 +38,10 @@ ukwinika-backups/
 ├── hooks/
 │   ├── pre_backup_hook.sh.example
 │   └── post_backup_hook.sh.example
-└── CONTRIBUTING.md                       # Optional but recommended
+├── .github/
+│   └── workflows/
+│       └── test.yml
+└── CONTRIBUTING.md
 ```
 
 ## Full Installation & Setup (Step-by-Step Instructions for Using the Backup Script)
