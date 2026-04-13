@@ -1,0 +1,35 @@
+
+```yaml
+name: Create Release Tarball
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-tarball:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Create ukwinika-backups-vX.Y.tar.gz (clean distribution archive)
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          tar -czf "ukwinika-backups-${TAG}.tar.gz" \
+            --exclude-vcs \
+            --exclude='.github' \
+            --transform "s|^|ukwinika-backups-${TAG}/|" \
+            .
+
+      - name: Upload tarball as release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ukwinika-backups-${{ github.event.release.tag_name }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
