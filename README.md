@@ -152,4 +152,3 @@ Copy the script to:
 - Common issues: missing dependencies, passphrase errors, insufficient permissions
 
 **ADVICE: A Backup is only as Good as its last Successful Restore.**
-```
