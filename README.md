@@ -73,41 +73,43 @@ sudo make systemd
 ## Full Installation & Setup (Step-by-Step Instructions for Using the Backup Script)
 
 1. **Initial Setup**
-   Copy the script to:
+Copy the script to:
    ```bash
    /usr/local/bin/enhanced_automated_backups.sh
+   ```
    and run chmod 700
+   ```bash
    sudo chmod 700 /usr/local/bin/enhanced_automated_backups.sh 
    ```
 
-2. **Install the Main Script**
+3. **Install the Main Script**
    ```bash
    sudo make install
    ```
 
-3. **Configure**
+4. **Configure**
    ```bash
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
    sudo nano /etc/ukwinika-backup.conf
    ```
 
-4. **Initialize Borg Repository (first run only)**
+5. **Initialize Borg Repository (first run only)**
    ```bash
    sudo borg init --encryption=repokey-aes256 /UKwinikaBackup/borg_repo
    ```
 
-5. **Deploy Systemd & Logrotate**
+6. **Deploy Systemd & Logrotate**
    ```bash
    sudo make systemd
    ```
 
-6. **Test the Backup**
+7. **Test the Backup**
    ```bash
    sudo enhanced_automated_backups.sh backup incremental borg
    ```
 
-7. **Enable Daily Automation**
+8. **Enable Daily Automation**
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    sudo systemctl status ukwinika-backup.timer
