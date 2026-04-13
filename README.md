@@ -42,6 +42,7 @@ ukwinika-backups/
 │   └── workflows/
 │       └── test.yml
 └── CONTRIBUTING.md
+```
 
 ## Quick Start
 Get started in minutes using the provided **Makefile** (recommended for easy installation, systemd deployment, and clean removal).
