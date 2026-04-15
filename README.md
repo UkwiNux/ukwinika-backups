@@ -47,6 +47,8 @@ ukwinika-backups/
 ## Quick Start
 Get started in minutes using the provided **Makefile** (recommended for easy installation, systemd deployment, and clean removal).
 
+**New in this update:** `sudo make install` now automatically installs BorgBackup on Debian/Ubuntu systems.
+
 ### Option 1: From Release Tarball (Recommended for Production)
 1. Download the latest `ukwinika-backups-v2.0.tar.gz` from the [GitHub Releases](https://github.com/UkwiNux/ukwinika-backups/releases) page.
 2. Extract it:
@@ -56,7 +58,7 @@ Get started in minutes using the provided **Makefile** (recommended for easy ins
    ```
 3. Install and deploy using the Makefile:
    ```bash
-   sudo make install     # Installs the main script to /usr/local/bin
+   sudo make install     # Installs script + Borg (Debian auto-detect)
    sudo make systemd     # Deploys systemd services + logrotate
    ```
 
@@ -70,50 +72,53 @@ sudo make systemd
 
 **Next steps:** Follow the detailed configuration, Borg initialization, testing, and automation steps in the **Full Installation & Setup** section below. The Makefile also supports `sudo make uninstall` and `sudo make clean` for maintenance.
 
-## Full Installation & Setup (Step-by-Step Instructions for Using the Backup Script)
+## Full Installation & Setup (Step-by-Step)
 
-1. **Initial Setup**
-Copy the script to:
-   ```bash
-   /usr/local/bin/enhanced_automated_backups.sh
-   ```
-   and run chmod 700
-   ```bash
-   sudo chmod 700 /usr/local/bin/enhanced_automated_backups.sh 
-   ```
+### 1. Prerequisites & Automatic Dependency Installation
+The Makefile now **automatically installs BorgBackup** on Debian/Ubuntu during `sudo make install`. No manual `apt install` needed.
 
-3. **Install the Main Script**
-   ```bash
-   sudo make install
-   ```
+### 2. Install the Script & Borg
+```bash
+cd ukwinika-backups
+sudo make install     # ← Automatically installs Borg on Debian + patches script for compatibility
+```
 
-4. **Configure**
-   ```bash
-   sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
-   sudo chmod 600 /etc/ukwinika-backup.conf
-   sudo nano /etc/ukwinika-backup.conf
-   ```
+### 3. Create Secure Passphrase (Required for Borg encryption)
+```bash
+# Use a strong, unique passphrase (20+ characters)
+sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
+sudo chmod 600 /etc/ukwinika-backup.secrets
+```
 
-5. **Initialize Borg Repository (first run only)**
-   ```bash
-   sudo borg init --encryption=repokey-aes256 /UKwinikaBackup/borg_repo
-   ```
+### 4. Initialize Borg Repository (Debian-compatible)
+```bash
+sudo mkdir -p /UKwinikaBackup
+sudo borg init --encryption=repokey /UKwinikaBackup/borg_repo
+# Use the EXACT same passphrase you saved in /etc/ukwinika-backup.secrets
+```
 
-6. **Deploy Systemd & Logrotate**
-   ```bash
-   sudo make systemd
-   ```
+### 5. Configure Main Settings
+```bash
+sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
+sudo chmod 600 /etc/ukwinika-backup.conf
+sudo nano /etc/ukwinika-backup.conf
+```
 
-7. **Test the Backup**
-   ```bash
-   sudo enhanced_automated_backups.sh backup incremental borg
-   ```
+### 6. Deploy Systemd & Logrotate
+```bash
+sudo make systemd
+```
 
-8. **Enable Daily Automation**
-   ```bash
-   sudo systemctl enable --now ukwinika-backup.timer
-   sudo systemctl status ukwinika-backup.timer
-   ```
+### 7. Test the Backup
+```bash
+sudo enhanced_automated_backups.sh backup incremental borg
+```
+
+### 8. Enable Daily Automation
+```bash
+sudo systemctl enable --now ukwinika-backup.timer
+sudo systemctl status ukwinika-backup.timer
+```
 
 ## Usage Examples
 
@@ -141,15 +146,17 @@ Copy the script to:
 - Log rotation handled automatically
 
 ## Security & Best Practices
-- Use Borg native `repokey-aes256` encryption.
-- Replicate Borg repo to S3 with **Object Lock** (Compliance mode) for immutability.
-- Run monthly restore drills (see `docs/RESTORE-CHECKLIST.md`).
-- Never commit passphrases or config files containing secrets.
+- Passphrase is stored securely in `/etc/ukwinika-backup.secrets` (600 permissions)
+- Borg uses `repokey` encryption on Debian (fully compatible with 1.4)
+- Replicate Borg repo to S3 with **Object Lock** (Compliance mode) for immutability
+- Run monthly restore drills (see `docs/RESTORE-CHECKLIST.md`)
+- Never commit passphrases or config files containing secrets
 
 ## Troubleshooting
-- Check `/var/log/UKwinikaBackup.log` and `_audit.log`
-- Borg health: `sudo borg check /UKwinikaBackup/borg_repo`
-- Common issues: missing dependencies, passphrase errors, insufficient permissions
+- **Passphrase error** → Check `/etc/ukwinika-backup.secrets` exists and matches the repo passphrase
+- **Borg not found** → Re-run `sudo make install` (auto-fixes)
+- **Log file missing** → First backup creates `/var/log/UKwinikaBackup.log`
+- **Debian-specific** → The Makefile automatically patches the script for Borg 1.4 compatibility
+- Borg health check: `sudo borg check /UKwinikaBackup/borg_repo`
 
 **ADVICE: A Backup is only as Good as its last Successful Restore.**
-```
