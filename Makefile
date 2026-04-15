@@ -1,6 +1,5 @@
 ### 2. Updated Makefile  
 
-```makefile
 .PHONY: install uninstall systemd clean deps
 
 INSTALL_DIR=/usr/local/bin
