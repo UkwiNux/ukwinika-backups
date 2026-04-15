@@ -159,4 +159,5 @@ sudo systemctl status ukwinika-backup.timer
 - **Debian-specific** → The Makefile automatically patches the script for Borg 1.4 compatibility
 - Borg health check: `sudo borg check /UKwinikaBackup/borg_repo`
 
-**ADVICE: A Backup is only as Good as its last Successful Restore.**
+
+**UKwinika's Notable Advice: A Backup is Only as Good as its Last Successful Restore.**
