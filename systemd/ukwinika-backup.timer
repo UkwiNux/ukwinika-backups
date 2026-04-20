@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily UKwinika Backup Timer
+Description=Daily UKwinika Backup Timer (v2.3)
 Requires=ukwinika-backup.service
 
 [Timer]
