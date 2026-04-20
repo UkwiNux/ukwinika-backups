@@ -65,23 +65,6 @@ sudo make install
 sudo make systemd
 ```
 
-## Where Backups Are Stored
-All backups are stored in a **single Borg repository** at:
-
-```
-/UKwinikaBackup/borg_repo
-```
-
-- Every backup run creates a new **archive** inside this repository.
-- Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
-- Borg automatically deduplicates data, so incremental backups remain small and efficient.
-- The repository contains the **full history** of all your backups.
-
-To list all archives:
-```bash
-sudo borg list /UKwinikaBackup/borg_repo
-```
-
 ## Full Installation & Setup
 
 1. **Install Script & Dependencies**  
@@ -123,6 +106,22 @@ sudo borg list /UKwinikaBackup/borg_repo
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    ```
+## Where Backups Are Stored
+All backups are stored in a **single Borg repository** at:
+
+```
+/UKwinikaBackup/borg_repo
+```
+
+- Every backup run creates a new **archive** inside this repository.
+- Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
+- Borg automatically deduplicates data, so incremental backups remain small and efficient.
+- The repository contains the **full history** of all your backups.
+
+To list all archives:
+```bash
+sudo borg list /UKwinikaBackup/borg_repo
+```
 
 ## How to Restore a File or Folder
 
