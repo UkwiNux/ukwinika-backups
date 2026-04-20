@@ -1,8 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Enhanced Automated Backup Script - Production Edition (Debian Fixed v2.1)
+# UKwinika Enhanced Automated Backup Script - Production Edition (v2.2)
 # Author: Urayayi Kwinika
-# Version: 2.1
+# Version: 2.2
+# Changes: Added --max-lock-wait 300 + better lock handling for Borg
 # =============================================================================
 
 set -euo pipefail
@@ -32,6 +33,7 @@ RETENTION_VERSIONS="${RETENTION_VERSIONS:-5}"
 LOG_FILE="${LOG_FILE:-/var/log/UKwinikaBackup.log}"
 AUDIT_LOG="${AUDIT_LOG:-/var/log/UKwinikaBackup_audit.log}"
 
+# Load passphrase
 if [[ -z "${UKWINIKA_PASSPHRASE:-}" ]]; then
     SECRETS_FILE="${SECRETS_FILE:-/etc/ukwinika-backup.secrets}"
     if [[ -f "$SECRETS_FILE" ]]; then
@@ -44,6 +46,15 @@ fi
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1" | tee -a "$LOG_FILE"; }
 audit() { echo "$(date '+%Y-%m-%d %H:%M:%S') [AUDIT] $1" | tee -a "$AUDIT_LOG"; }
+
+# Better Borg lock handling
+break_stale_lock() {
+    if [[ -f "${BORG_REPO}/lock.exclusive" ]] || [[ -f "${BORG_REPO}/lock.roster" ]]; then
+        log "Stale Borg lock detected. Breaking lock..."
+        borg break-lock "${BORG_REPO}" || true
+        sleep 2
+    fi
+}
 
 db_dump() {
     local DUMP_FILE="$BACKUP_DIR/db_dump_$(date +%s).sql"
@@ -62,18 +73,25 @@ perform_backup() {
     log "=== Starting ${BACKUP_TYPE} backup using ${BACKUP_TOOL} ==="
     audit "Backup started"
 
+    break_stale_lock
+
     local DB_DUMP=$(db_dump)
 
     case "$BACKUP_TOOL" in
         borg)
-            # FIXED: No --encryption flag on create (only used in borg init)
+            # Improved: Added --max-lock-wait 300 (5 minutes) + progress display
             borg create --compression=lz4 --checkpoint-interval=300 \
+                --max-lock-wait 300 \
+                --progress \
                 "${BORG_REPO}::${BACKUP_NAME}" \
                 "${INCLUDE_DIRS[@]}" "$DB_DUMP" "${EXCLUDE_DIRS[@]}"
-            borg prune --keep-daily "$RETENTION_DAYS" --keep-last "$RETENTION_VERSIONS" --stats "$BORG_REPO"
-            borg check --verify-data "$BORG_REPO" || log "Warning: Borg check failed"
+            
+            borg prune --keep-daily "$RETENTION_DAYS" --keep-last "$RETENTION_VERSIONS" --stats "${BORG_REPO}"
+            borg check --verify-data "${BORG_REPO}" || log "Warning: Borg repository check failed"
             ;;
-        *) log "Tool $BACKUP_TOOL not fully implemented yet"; ;;
+        *) 
+            log "Tool $BACKUP_TOOL not fully implemented yet"
+            ;;
     esac
 
     log "=== Backup completed successfully ==="
