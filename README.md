@@ -1,6 +1,6 @@
 # UKwinika Enhanced Automated Backup Script
 
-**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support, and Ransomware-Resistant Design.
+**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media and Ansible Support.
 
 **Author:** Urayayi Kwinika  
 **Version:** 2.3  
