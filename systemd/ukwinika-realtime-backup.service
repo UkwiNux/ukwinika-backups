@@ -1,5 +1,5 @@
 [Unit]
-Description=UKwinika Real-Time Backup Daemon
+Description=UKwinika Real-Time File Monitoring Service (v2.3 - inotify)
 After=network.target
 
 [Service]
