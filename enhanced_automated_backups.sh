@@ -1,13 +1,16 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Enhanced Automated Backup Script - Production Edition (v2.2)
-# Author: Urayayi Kwinika
+# UKwinika Enhanced Automated Backup Script
 # Version: 2.2
-# Changes: Added --max-lock-wait 300 + better lock handling for Borg
+# Author: Urayayi Kwinika
+# Last Updated: April 2026
+# Description: Production-ready backup script with improved Borg lock handling
+# Changes in v2.2: Added --max-lock-wait 300 + automatic stale lock breaker
 # =============================================================================
 
 set -euo pipefail
 
+# ====================== LOAD EXTERNAL CONFIGURATION ======================
 CONFIG_FILE="/etc/ukwinika-backup.conf"
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
@@ -16,6 +19,7 @@ else
     exit 1
 fi
 
+# ====================== DEFAULTS & VARIABLES ======================
 MODE="${1:-backup}"
 BACKUP_TYPE="${2:-incremental}"
 BACKUP_TOOL="${3:-borg}"
@@ -33,7 +37,7 @@ RETENTION_VERSIONS="${RETENTION_VERSIONS:-5}"
 LOG_FILE="${LOG_FILE:-/var/log/UKwinikaBackup.log}"
 AUDIT_LOG="${AUDIT_LOG:-/var/log/UKwinikaBackup_audit.log}"
 
-# Load passphrase
+# Load passphrase from secrets file (required for encrypted Borg repo)
 if [[ -z "${UKWINIKA_PASSPHRASE:-}" ]]; then
     SECRETS_FILE="${SECRETS_FILE:-/etc/ukwinika-backup.secrets}"
     if [[ -f "$SECRETS_FILE" ]]; then
@@ -44,13 +48,14 @@ if [[ -z "${UKWINIKA_PASSPHRASE:-}" ]]; then
     fi
 fi
 
+# ====================== HELPER FUNCTIONS ======================
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1" | tee -a "$LOG_FILE"; }
 audit() { echo "$(date '+%Y-%m-%d %H:%M:%S') [AUDIT] $1" | tee -a "$AUDIT_LOG"; }
 
-# Better Borg lock handling
+# v2.2: Automatic stale lock detection and breaking (prevents "lock timeout" errors)
 break_stale_lock() {
     if [[ -f "${BORG_REPO}/lock.exclusive" ]] || [[ -f "${BORG_REPO}/lock.roster" ]]; then
-        log "Stale Borg lock detected. Breaking lock..."
+        log "Stale Borg lock detected. Breaking lock automatically..."
         borg break-lock "${BORG_REPO}" || true
         sleep 2
     fi
@@ -70,16 +75,16 @@ perform_backup() {
     local TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
     local BACKUP_NAME="system_backup_${BACKUP_TYPE}_${TIMESTAMP}"
 
-    log "=== Starting ${BACKUP_TYPE} backup using ${BACKUP_TOOL} ==="
-    audit "Backup started"
+    log "=== Starting ${BACKUP_TYPE} Backup using ${BACKUP_TOOL} ==="
+    audit "Backup Started"
 
-    break_stale_lock
+    break_stale_lock   # v2.2 improvement
 
     local DB_DUMP=$(db_dump)
 
     case "$BACKUP_TOOL" in
         borg)
-            # Improved: Added --max-lock-wait 300 (5 minutes) + progress display
+            # v2.2: Added --max-lock-wait 300 (5 minutes) and --progress for better UX
             borg create --compression=lz4 --checkpoint-interval=300 \
                 --max-lock-wait 300 \
                 --progress \
@@ -87,16 +92,17 @@ perform_backup() {
                 "${INCLUDE_DIRS[@]}" "$DB_DUMP" "${EXCLUDE_DIRS[@]}"
             
             borg prune --keep-daily "$RETENTION_DAYS" --keep-last "$RETENTION_VERSIONS" --stats "${BORG_REPO}"
-            borg check --verify-data "${BORG_REPO}" || log "Warning: Borg repository check failed"
+            borg check --verify-data "${BORG_REPO}" || log "Warning: Borg Repository check failed"
             ;;
         *) 
             log "Tool $BACKUP_TOOL not fully implemented yet"
             ;;
     esac
 
-    log "=== Backup completed successfully ==="
+    log "=== Backup Completed Successfully ==="
 }
 
+# ====================== MAIN EXECUTION ======================
 case "$MODE" in
     backup)
         perform_backup
