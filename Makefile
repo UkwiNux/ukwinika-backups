@@ -17,6 +17,7 @@ deps:
 install: deps
 	@sudo install -m 700 $(SCRIPT) $(INSTALL_DIR)/
 	@echo "✅ Script installed to $(INSTALL_DIR)/$(SCRIPT)"
+	@echo "✅ Lock handling improved (max-lock-wait 300 + stale lock breaker)"
 
 uninstall: 
 	@sudo rm -f $(INSTALL_DIR)/$(SCRIPT)
