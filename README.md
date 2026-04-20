@@ -8,7 +8,7 @@
 **License:** MIT
 
 ## Features
-- Backup modes: `backup`, `real-time` (inotify), `restore` (with safe drill mode)
+- Backup Modes: `backup`, `real-time` (inotify), `restore` (with Safe Drill Mode)
 - Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
 - Optional tools: rsync, rsnapshot, duplicity
 - Adaptive DB dumps (MySQL, PostgreSQL, Oracle) with optional LVM snapshots
@@ -130,13 +130,13 @@ sudo borg list /UKwinikaBackup/borg_repo
 # Safe Drill Mode (Preview Only)
 sudo enhanced_automated_backups.sh restore drill borg system_backup_incremental_20260420_125524
 
-# Full restore of a specific archive
+# Full Restore of a specific archive
 sudo enhanced_automated_backups.sh restore full borg system_backup_incremental_20260420_125524
 ```
 
 ### Option 2: Manual Borg Commands (Advanced Control)
 ```bash
-# List all backups
+# List all Backups
 sudo borg list /UKwinikaBackup/borg_repo
 
 # Restore a single file (example)
@@ -147,9 +147,9 @@ sudo borg extract --strip-components 1 \
 # Restore an entire folder (example)
 sudo borg extract --strip-components 1 \
     /UKwinikaBackup/borg_repo::system_backup_incremental_20260420_125524 \
-    home/pafariam
+    home/username
 
-# Safe browse mode (mount as virtual filesystem)
+# Safe Browse Mode (mount as Virtual Filesystem)
 sudo mkdir -p /mnt/borg-restore
 sudo borg mount /UKwinikaBackup/borg_repo /mnt/borg-restore
 ls /mnt/borg-restore
