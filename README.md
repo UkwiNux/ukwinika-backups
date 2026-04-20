@@ -73,6 +73,7 @@ sudo make systemd
 
 2. **Create Secure Passphrase**  
    ```bash
+   # Type your Pass Phrase Here
    sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
    ```
