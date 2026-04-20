@@ -1,25 +1,31 @@
-# UKwinika Backup Configuration – Example
+# =============================================================================
+# UKwinika Backup Configuration - v2.3
 # Copy to /etc/ukwinika-backup.conf and chmod 600
+# =============================================================================
 
+# Backup settings
 BACKUP_DIR="/UKwinikaBackup"
 REMOVABLE_MOUNT="/media/usb"
 BORG_REPO="/UKwinikaBackup/borg_repo"
 
-INCLUDE_DIRS=("/etc" "/home" "/var/www" "/var/lib/mysql" "/var/lib/postgresql")
-EXCLUDE_DIRS=("--exclude=/home/*/tmp" "--exclude=/var/cache" "--exclude=/proc" "--exclude=/sys" "--exclude=/dev")
+# Which directories to back up
+INCLUDE_DIRS="/etc /home /var/www /var/lib/mysql /var/lib/postgresql /opt/oracle"
+EXCLUDE_DIRS="--exclude=/home/*/tmp --exclude=/var/cache --exclude=/proc --exclude=/sys --exclude=/dev"
 
-REAL_TIME_DIRS=("/home" "/var/www")
-
-DB_TYPE="mysql"
+# Retention policy
 RETENTION_DAYS=7
 RETENTION_VERSIONS=5
-STORAGE_THRESHOLD=80
 
-# Change to your work or preferred email address for use.
+# Database settings
+DB_TYPE="mysql"                    # mysql, postgresql, oracle
+USE_LVM_SNAPSHOT="false"           # Set to "true" if you have LVM volumes for hot snapshots
 
-EMAIL_TO="sysadmin@example.com"
-SLACK_WEBHOOK=""
+# Hooks
+PRE_BACKUP_HOOK="/etc/ukwinika/pre_backup_hook.sh"
+POST_BACKUP_HOOK="/etc/ukwinika/post_backup_hook.sh"
 
-# Optional hooks (make executable)
-PRE_BACKUP_HOOK="/usr/local/bin/pre_backup_hook.sh"
-POST_BACKUP_HOOK="/usr/local/bin/post_backup_hook.sh"
+# Prometheus metrics (optional)
+PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
+
+# Other options
+STORAGE_THRESHOLD=80               # Percentage threshold for warnings
