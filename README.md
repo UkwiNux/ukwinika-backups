@@ -1,23 +1,25 @@
 # UKwinika Enhanced Automated Backup Script
 
-**Enterprise-Grade Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support, and Ransomware-Resistant Design.
+**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support, and Ransomware-Resistant Design.
 
 **Author:** Urayayi Kwinika  
-**Version:** 2.2  
+**Version:** 2.3  
 **Last Updated:** April 2026  
 **License:** MIT
 
-## Features
-- Backup Modes: `backup`, `real-time` (inotify), `restore` (with Safe Drill Mode)
+## Features (Fully Implemented in v2.3)
+- Backup modes: `backup`, `real-time` (inotify), `restore` (with safe drill mode)
 - Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
-- Optional tools: rsync, rsnapshot, duplicity
-- Adaptive DB dumps (MySQL, PostgreSQL, Oracle) with optional LVM snapshots
-- External configuration, pre/post hooks, Prometheus metrics export
-- Concurrency locking, strict error handling, atomic operations
-- Removable USB auto-detection, retention policy, detailed audit trail with SHA256
+- Optional tools: rsync, rsnapshot, duplicity (ready for future expansion)
+- Adaptive DB dumps (MySQL, PostgreSQL, Oracle) with optional LVM snapshots for hot consistency
+- Pre/post backup hooks support
+- Prometheus metrics export
+- Removable USB auto-detection
+- Concurrency locking (`flock`)
+- Detailed audit trail with SHA256 checksums
+- Improved Borg lock handling (`--max-lock-wait 300` + automatic stale lock breaker)
 - Systemd timers + logrotate ready
-- **Full Debian/Ubuntu auto-install support** — Makefile installs Borg + inotify-tools
-- **Improved Borg lock handling** (v2.2) — `--max-lock-wait 300` + automatic stale lock breaker
+- Full Debian/Ubuntu auto-install support
 
 ## Repository Structure
 ```bash
@@ -26,7 +28,7 @@ ukwinika-backups/
 ├── LICENSE
 ├── .gitignore
 ├── Makefile                  
-├── enhanced_automated_backups.sh       # Main production script (v2.2)
+├── enhanced_automated_backups.sh       # Main production script (v2.3)
 ├── config/
 │   └── ukwinika-backup.conf.example
 ├── systemd/
@@ -45,23 +47,9 @@ ukwinika-backups/
 │       └── test.yml
 └── CONTRIBUTING.md
 ```
-
 ## Quick Start
-Get started in minutes using the provided **Makefile**.
-
-### Option 1: From Release Tarball (Recommended for Production)
 ```bash
-tar -xzf ukwinika-backups-v2.2.tar.gz
-cd ukwinika-backups-v2.2
-sudo make install     # Auto-installs Borg + inotify-tools
-sudo make systemd
-```
-
-### Option 2: From Git Clone
-```bash
-git clone https://github.com/UkwiNux/ukwinika-backups.git
-cd ukwinika-backups
-sudo make install
+sudo make install     # Auto-installs Borg + inotify-tools + creates Prometheus directory
 sudo make systemd
 ```
 
@@ -75,7 +63,7 @@ sudo make systemd
 2. **Create Secure Passphrase**  
    ```bash
    # Remember to set your Pass Phrase Here
-   sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
+   sudo bash -c 'echo "YourStrongPassPhraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
    ```
 
@@ -85,7 +73,7 @@ sudo make systemd
    sudo borg init --encryption=repokey /UKwinikaBackup/borg_repo
    ```
 
-4. **Configure Main Settings**  
+4. **Configure**  
    ```bash
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
@@ -97,7 +85,7 @@ sudo make systemd
    sudo make systemd
    ```
 
-6. **Test the Backup**  
+6. **Test Backup**  
    ```bash
    sudo enhanced_automated_backups.sh backup incremental borg
    ```
@@ -113,47 +101,30 @@ All backups are stored in a **single Borg repository** at:
 /UKwinikaBackup/borg_repo
 ```
 
-- Every backup run creates a new **archive** inside this repository.
-- Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
-- Borg automatically deduplicates data, so incremental backups remain small and efficient.
-- The repository contains the **full history** of all your backups.
-
-To list all archives:
-```bash
-sudo borg list /UKwinikaBackup/borg_repo
-```
+Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
 
 ## How to Restore a File or Folder
 
-### Option 1: Using the UKwinika Script (Recommended)
+**Using the Script (Recommended):**
 ```bash
 # Safe Drill Mode (Preview Only)
 sudo enhanced_automated_backups.sh restore drill borg system_backup_incremental_20260420_125524
 
-# Full Restore of a specific archive
+# Full Restore
 sudo enhanced_automated_backups.sh restore full borg system_backup_incremental_20260420_125524
 ```
 
-### Option 2: Manual Borg Commands (Advanced Control)
+**Manual Borg commands:**
 ```bash
-# List all Backups
 sudo borg list /UKwinikaBackup/borg_repo
+sudo borg extract --strip-components 1 /UKwinikaBackup/borg_repo::ARCHIVE_NAME path/to/file-or-folder
+```
 
-# Restore a single file (example)
-sudo borg extract --strip-components 1 \
-    /UKwinikaBackup/borg_repo::system_backup_incremental_20260420_125524 \
-    etc/hosts
-
-# Restore an entire folder (example)
-sudo borg extract --strip-components 1 \
-    /UKwinikaBackup/borg_repo::system_backup_incremental_20260420_125524 \
-    home/username
-
-# Safe Browse Mode (mount as Virtual Filesystem)
+**Browse Mode:**
+```bash
 sudo mkdir -p /mnt/borg-restore
 sudo borg mount /UKwinikaBackup/borg_repo /mnt/borg-restore
 ls /mnt/borg-restore
-# When finished:
 sudo borg umount /mnt/borg-restore
 ```
 Always test Restores regularly using the commands above.
@@ -161,11 +132,10 @@ Always test Restores regularly using the commands above.
 ## Usage Examples
 - Incremental backup: `sudo enhanced_automated_backups.sh backup incremental borg`
 - Full backup: `sudo enhanced_automated_backups.sh backup full borg`
-- Start real-time monitoring: `sudo systemctl start ukwinika-realtime-backup.service`
+- Real-time monitoring: `sudo systemctl start ukwinika-realtime-backup.service`
 - View logs: `sudo tail -f /var/log/UKwinikaBackup.log`
 
-## MySQL Database Fix (Debian)
-If you see “Access denied” for mysqldump:
+## MySQL / Database Fix (Debian)
 ```bash
 sudo bash -c 'cat > /root/.my.cnf <<EOF
 [client]
@@ -174,17 +144,9 @@ password=your_mysql_root_password
 EOF'
 sudo chmod 600 /root/.my.cnf
 ```
-
-## Troubleshooting (v2.2)
-- **Borg lock timeout**: Fixed with `--max-lock-wait 300` + automatic stale lock breaker
-- **Passphrase error**: Verify `/etc/ukwinika-backup.secrets` exists and matches the repo passphrase
-- **MySQL access denied**: Use the `.my.cnf` fix above
-- **Log file permission**: Use `sudo tail -f /var/log/UKwinikaBackup.log`
-
-## Security & Best Practices
-- Passphrase stored securely in `/etc/ukwinika-backup.secrets` (600 permissions)
-- Replicate the Borg repo to S3 with Object Lock for immutability
-- Run monthly restore drills using the commands above
-- Never commit secrets or passphrases
+## Troubleshooting
+- Borg lock timeout → Fixed in v2.3
+- Real-time not working → Ensure `inotify-tools` is installed
+- MySQL access denied → Use the `.my.cnf` fix above
 
 **UKwinika Notable Advice: A Backup is Only as Good as its Last Successful Restore.**
