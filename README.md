@@ -3,7 +3,7 @@
 **Exclusive Production-Ready Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support, and Ransomware-Resistant Design.
 
 **Author:** Urayayi Kwinika  
-**Version:** 2.1  
+**Version:** 2.2  
 **Last Updated:** April 2026  
 **License:** MIT
 
@@ -16,7 +16,8 @@
 - Concurrency locking, strict error handling, atomic operations
 - Removable USB auto-detection, retention policy, detailed audit trail with SHA256
 - Systemd timers + logrotate ready
-- **Full Debian/Ubuntu support** – Makefile auto-installs Borg + inotify-tools
+- **Full Debian/Ubuntu support** — Makefile auto-installs Borg + inotify-tools
+- **Improved Borg lock handling** (v2.2) — automatic stale lock breaker + 5-minute timeout
 
 ## Repository Structure
 ```bash
@@ -25,7 +26,7 @@ ukwinika-backups/
 ├── LICENSE
 ├── .gitignore
 ├── Makefile                  
-├── enhanced_automated_backups.sh       # Main production script (v2.1)
+├── enhanced_automated_backups.sh       # Main production script (v2.2)
 ├── config/
 │   └── ukwinika-backup.conf.example
 ├── systemd/
@@ -49,13 +50,11 @@ ukwinika-backups/
 **Recommended for Production**
 
 ### Option 1: From Release Tarball
-1. Download `ukwinika-backups-v2.1.tar.gz` from [Releases](https://github.com/UkwiNux/ukwinika-backups/releases)
-2. Extract and install:
-   ```bash
-   tar -xzf ukwinika-backups-v2.1.tar.gz && cd ukwinika-backups-v2.1
-   sudo make install     # Auto-installs Borg + inotify-tools on Debian
-   sudo make systemd
-   ```
+```bash
+tar -xzf ukwinika-backups-v2.2.tar.gz && cd ukwinika-backups-v2.2
+sudo make install     # Auto-installs Borg + inotify-tools + improved lock handling
+sudo make systemd
+```
 
 ### Option 2: From Git Clone
 ```bash
@@ -96,18 +95,17 @@ sudo make systemd
    sudo make systemd
    ```
 
-6. **Test**  
+6. **Test Backup**  
    ```bash
    sudo enhanced_automated_backups.sh backup incremental borg
    ```
 
-7. **Enable Automation**  
+7. **Enable Daily Automation**  
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    ```
 
 ## MySQL Database Fix (Debian)
-If you see “Access denied” for mysqldump:
 ```bash
 sudo bash -c 'cat > /root/.my.cnf <<EOF
 [client]
@@ -120,13 +118,20 @@ sudo chmod 600 /root/.my.cnf
 ## Usage Examples
 - Incremental backup: `sudo enhanced_automated_backups.sh backup incremental borg`
 - Full backup: `sudo enhanced_automated_backups.sh backup full borg`
-- Real-time: `sudo systemctl start ukwinika-realtime-backup.service`
-- View logs: `tail -f /var/log/UKwinikaBackup.log`
+- Real-time monitoring: `sudo systemctl start ukwinika-realtime-backup.service`
+- View logs: `sudo tail -f /var/log/UKwinikaBackup.log`
 
-## Troubleshooting
-- **Borg encryption error** → Fixed in v2.1 (automatically patched)
-- **inotify-tools warning** → Fixed by `make install`
-- **Passphrase error** → Check `/etc/ukwinika-backup.secrets`
-- **Borg health check**: `sudo borg check /UKwinikaBackup/borg_repo`
+## Troubleshooting (v2.2)
 
-**UKwinika's Notable Advice: A Backup is only as Good as its Last Successful Restore.**
+- **Borg lock timeout** (`Failed to create/acquire the lock`):  
+  Automatically handled in v2.2 with `--max-lock-wait 300` and stale lock breaker.  
+  Manual recovery: `sudo borg break-lock /UKwinikaBackup/borg_repo`
+
+- **Borg encryption error**: Fixed since v2.1
+- **inotify-tools warning**: Fixed automatically by `make install`
+- **MySQL Access denied**: Use the `.my.cnf` fix above
+- **Passphrase error**: Verify `/etc/ukwinika-backup.secrets` exists and matches your repo
+
+**New in v2.2**: Automatic stale lock detection and 5-minute lock wait time for more reliable backups.
+
+**UKwinika Notable Advice: A Backup is only as Good as its Last Successful Restore.**
