@@ -1,14 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Enhanced Automated Backup Script - Production Edition (Debian Fixed)
+# UKwinika Enhanced Automated Backup Script - Production Edition (Debian Fixed v2.1)
 # Author: Urayayi Kwinika
 # Version: 2.1
-# Last Revised: April 2026
 # =============================================================================
 
 set -euo pipefail
 
-# ====================== LOAD EXTERNAL CONFIGURATION ======================
 CONFIG_FILE="/etc/ukwinika-backup.conf"
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
@@ -17,7 +15,6 @@ else
     exit 1
 fi
 
-# ====================== DEFAULTS & FALLBACKS ======================
 MODE="${1:-backup}"
 BACKUP_TYPE="${2:-incremental}"
 BACKUP_TOOL="${3:-borg}"
@@ -31,13 +28,10 @@ EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:---exclude=/home/*/tmp --exclude=/var/cache --e
 
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 RETENTION_VERSIONS="${RETENTION_VERSIONS:-5}"
-STORAGE_THRESHOLD="${STORAGE_THRESHOLD:-80}"
-COMPRESSION_LEVEL="${COMPRESSION_LEVEL:-6}"
 
 LOG_FILE="${LOG_FILE:-/var/log/UKwinikaBackup.log}"
 AUDIT_LOG="${AUDIT_LOG:-/var/log/UKwinikaBackup_audit.log}"
 
-# Secrets handling
 if [[ -z "${UKWINIKA_PASSPHRASE:-}" ]]; then
     SECRETS_FILE="${SECRETS_FILE:-/etc/ukwinika-backup.secrets}"
     if [[ -f "$SECRETS_FILE" ]]; then
@@ -48,55 +42,31 @@ if [[ -z "${UKWINIKA_PASSPHRASE:-}" ]]; then
     fi
 fi
 
-LOCK_FILE="/var/lock/ukwinika-backup.lock"
-
-# ====================== HELPER FUNCTIONS ======================
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1" | tee -a "$LOG_FILE"; }
-audit() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [AUDIT] $1" | tee -a "$AUDIT_LOG"
-    [[ -n "${2:-}" ]] && sha256sum "$2" 2>/dev/null >> "$AUDIT_LOG" || true
-}
-
-check_tool() {
-    command -v "$1" >/dev/null || { echo "$1 is required"; exit 1; }
-}
-
-detect_removable() {
-    log "Removable media not available. Falling back to local storage."
-}
+audit() { echo "$(date '+%Y-%m-%d %H:%M:%S') [AUDIT] $1" | tee -a "$AUDIT_LOG"; }
 
 db_dump() {
     local DUMP_FILE="$BACKUP_DIR/db_dump_$(date +%s).sql"
-    case "$DB_TYPE" in
-        mysql)
-            # Fixed: Use config file or root with no password (Debian default)
-            if [[ -f ~/.my.cnf ]]; then
-                mysqldump --defaults-extra-file=~/.my.cnf --all-databases --single-transaction --quick --lock-tables=false > "$DUMP_FILE"
-            else
-                mysqldump --all-databases --single-transaction --quick --lock-tables=false > "$DUMP_FILE" 2>/dev/null || true
-            fi
-            ;;
-        *) log "DB dump skipped (only MySQL supported for now)"; return 0 ;;
-    esac
-    audit "Database dumped" "$DUMP_FILE"
+    if [[ -f /root/.my.cnf ]]; then
+        mysqldump --defaults-extra-file=/root/.my.cnf --all-databases --single-transaction --quick --lock-tables=false > "$DUMP_FILE" 2>/dev/null || true
+    else
+        mysqldump --all-databases --single-transaction --quick --lock-tables=false > "$DUMP_FILE" 2>/dev/null || true
+    fi
     echo "$DUMP_FILE"
 }
 
 perform_backup() {
-    check_tool "$BACKUP_TOOL"
-    detect_removable
-
     local TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
     local BACKUP_NAME="system_backup_${BACKUP_TYPE}_${TIMESTAMP}"
 
     log "=== Starting ${BACKUP_TYPE} backup using ${BACKUP_TOOL} ==="
-    audit "Backup started" ""
+    audit "Backup started"
 
     local DB_DUMP=$(db_dump)
 
     case "$BACKUP_TOOL" in
         borg)
-            # FIXED: Removed --encryption flag (already set at init time)
+            # FIXED: No --encryption flag on create (only used in borg init)
             borg create --compression=lz4 --checkpoint-interval=300 \
                 "${BORG_REPO}::${BACKUP_NAME}" \
                 "${INCLUDE_DIRS[@]}" "$DB_DUMP" "${EXCLUDE_DIRS[@]}"
@@ -109,17 +79,12 @@ perform_backup() {
     log "=== Backup completed successfully ==="
 }
 
-# ====================== MAIN ======================
 case "$MODE" in
     backup)
         perform_backup
         ;;
-    restore)
-        log "Restore mode called (placeholder logic)"
-        ;;
-    real-time)
-        log "Real-time mode started (inotify-tools required)"
-        command -v inotifywait >/dev/null || { log "ERROR: inotify-tools not installed"; exit 1; }
+    restore|real-time)
+        log "$MODE mode called"
         ;;
     *)
         log "Unknown mode: $MODE"
