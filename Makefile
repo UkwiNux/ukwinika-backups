@@ -1,6 +1,6 @@
 # =============================================================================
 # UKwinika Backup Project Makefile
-# Version: 2.3
+# Version: 2.4
 # Author: Urayayi Kwinika
 # Description: Handles installation, dependencies, and systemd deployment
 # Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS Systems
