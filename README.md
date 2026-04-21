@@ -1,15 +1,16 @@
 # UKwinika Enhanced Automated Backup Script [EABS]
 
-**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support etc.
+**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support & Cloud Backup Support.
 
 **Author:** Urayayi Kwinika  
-**Version:** 2.3  
+**Version:** 2.4  
 **Last Updated:** April 2026  
 **License:** MIT
 
-## Features (Fully Implemented in v2.3)
+## Features (Fully Implemented in v2.4)
 - Backup modes: `backup`, `real-time` (inotify), `restore` (with safe drill mode)
 - Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
+- 3-2-1 Backup Principle: Primary on System, Secondary on Removable USB, Tertiary on Cloud
 - Optional tools: rsync, rsnapshot, duplicity (ready for expansion)
 - Adaptive DB dumps (MySQL, PostgreSQL, Oracle) with optional LVM snapshots
 - Pre/post backup hooks
@@ -113,7 +114,7 @@ After installation, follow the **Full Installation & Setup** section below.
 - The Makefile automatically enables the EPEL repository and installs borgbackup via dnf.
 - Ensure your system is registered with Red Hat Subscription Manager (or using Rocky/AlmaLinux) for full package access.
 
-## Ansible Integration (v2.3)
+## Ansible Integration (v2.4)
 
 UKwinika EABS now includes native Ansible support for large-scale, idempotent deployments.
 
@@ -133,14 +134,18 @@ Key Ansible features:
 - Optional inventory-based passphrase and config management
 - Role variables for customizing DB_TYPE, retention, real-time directories, etc.
 
-See the `ansible/` directory (planned for v2.4) or use the current Makefile for manual Ansible integration.
+See the `ansible/` directory (planned for v2.5) or use the current Makefile for manual Ansible integration.
 
-## Where Backups Are Stored Locally
-All backups are stored in a **single Borg repository** at:
-
-```
-/UKwinikaBackup/borg_repo
-```
+The script automatically follows the 3-2-1 backup rule:
+- After the primary Borg backup completes on the system disk, it will:
+   - Copy the new archive to removable USB if present
+   - Upload the new archive to the cloud if `CLOUD_REMOTE` is set in the config
+     
+## Where Backups Are Stored (3-2-1 Principle)
+- Primary copy (always): `/UKwinikaBackup/borg_repo` (system disk)
+- Secondary copy (if USB detected): `/media/usb` or configured `REMOVABLE_MOUNT`
+- Tertiary copy (if configured): Cloud storage via `rclone`
+  
 Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
 
 ## How to Restore a File or Folder
@@ -185,7 +190,7 @@ EOF'
 sudo chmod 600 /root/.my.cnf
 ```
 ## Troubleshooting
-- **Borg lock timeout** → Fixed in v2.3 (automatic stale lock breaker)
+- **Borg lock timeout** → Fixed in v2.4 (automatic stale lock breaker)
 - **Real-time monitoring not working** → Ensure `inotify-tools` is installed
 - **MySQL access denied** → Use the `.my.cnf` fix above
 - **Passphrase prompt** → Verify `/etc/ukwinika-backup.secrets`
