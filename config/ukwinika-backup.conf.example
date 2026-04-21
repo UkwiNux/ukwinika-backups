@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Configuration - v2.3
+# UKwinika Backup Configuration - v2.4
 # Copy this file to /etc/ukwinika-backup.conf and run: sudo chmod 600 /etc/ukwinika-backup.conf
 # =============================================================================
 
