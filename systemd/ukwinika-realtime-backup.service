@@ -1,11 +1,22 @@
+# =============================================================================
+# UKwinika Real-Time File Monitoring Service - v2.3
+# Uses inotify for instant backup on file changes
+# =============================================================================
 [Unit]
-Description=UKwinika Real-Time File Monitoring Service (v2.3 - inotify)
-After=network.target
+Description=UKwinika Real-Time Backup Service (v2.3 - inotify monitoring)
+After=network.target remote-fs.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/enhanced_automated_backups.sh real-time
 Restart=always
-RestartSec=10
-Nice=19
+RestartSec=5
+EnvironmentFile=-/etc/ukwinika-backup.conf
 User=root
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
