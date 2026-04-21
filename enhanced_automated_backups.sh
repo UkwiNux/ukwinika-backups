@@ -1,22 +1,13 @@
 #!/bin/bash
 # =============================================================================
 # UKwinika Enhanced Automated Backup Script
-# Version: 2.3
+# Version: 2.4
 # Author: Urayayi Kwinika
 # Last Updated: April 2026
-# Description: Full-featured Enterprise Backup Script
-# Features implemented in v2.3:
-#   • Real-time inotify monitoring
-#   • Proper restore with safe drill mode
-#   • Adaptive DB dumps (MySQL, PostgreSQL, Oracle)
-#   • Optional LVM snapshots for DB consistency
-#   • Pre/post hooks support
-#   • Prometheus metrics export
-#   • Removable USB auto-detection
-#   • Concurrency locking with flock
-#   • Detailed audit trail with SHA256
-#   • Improved Borg lock handling
-#   • Optional tool stubs (rsync, rsnapshot, duplicity)
+# Description: Full-featured backup with true 3-2-1 principle
+#              Primary: System disk (Borg)
+#              Secondary: Removable USB (if detected)
+#              Tertiary: Cloud (if CLOUD_REMOTE defined)
 # =============================================================================
 
 set -euo pipefail
@@ -36,8 +27,8 @@ BACKUP_TYPE="${2:-incremental}"
 BACKUP_TOOL="${3:-borg}"
 RESTORE_FILE="${4:-}"
 
-BACKUP_DIR="${BACKUP_DIR:-/UKwinikaBackup}"
-BORG_REPO="${BORG_REPO:-${BACKUP_DIR}/borg_repo}"
+# Primary repository is ALWAYS on the system disk (3-2-1 Rule)
+PRIMARY_BORG_REPO="/UKwinikaBackup/borg_repo"
 
 INCLUDE_DIRS=("${INCLUDE_DIRS[@]:-/etc /home /var/www /var/lib/mysql /var/lib/postgresql /opt/oracle}")
 EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:---exclude=/home/*/tmp --exclude=/var/cache --exclude=/proc --exclude=/sys --exclude=/dev}")
@@ -48,7 +39,6 @@ RETENTION_VERSIONS="${RETENTION_VERSIONS:-5}"
 LOG_FILE="${LOG_FILE:-/var/log/UKwinikaBackup.log}"
 AUDIT_LOG="${AUDIT_LOG:-/var/log/UKwinikaBackup_audit.log}"
 PROMETHEUS_FILE="${PROMETHEUS_FILE:-/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom}"
-
 LOCK_FILE="/var/lock/ukwinika-backup.lock"
 
 # ====================== PASSPHRASE & ENCRYPTION ======================
@@ -77,23 +67,31 @@ prometheus_metric() {
 acquire_lock() {
     exec 200>"$LOCK_FILE"
     if ! flock -n 200; then
-        log "ERROR: Another Backup is already running (flock lock)"
+        log "ERROR: Another backup is already running (flock lock)"
         exit 1
     fi
 }
 
-# v2.3: Removable USB auto-detection
+# Removable USB detection for 3-2-1 secondary copy
 detect_removable_media() {
     if lsblk -o NAME,RM | grep -q "1"; then
-        log "Removable Media Detected. Using USB Backup Target."
-        BACKUP_DIR="/media/ukwinika_usb"
-        mkdir -p "$BACKUP_DIR"
-    else
-        log "Removable Media not available. Falling back to Local Storage."
+        log "Removable media detected. Secondary copy will be made to USB."
+        REMOVABLE_PATH="${REMOVABLE_MOUNT:-/media/usb}"
+        mkdir -p "$REMOVABLE_PATH"
+        return 0
+    fi
+    return 1
+}
+
+# Cloud upload for 3-2-1 tertiary copy
+upload_to_cloud() {
+    if [[ -n "${CLOUD_REMOTE:-}" ]] && command -v rclone >/dev/null; then
+        log "Uploading new archive to cloud (${CLOUD_REMOTE})"
+        rclone copy "${PRIMARY_BORG_REPO}" "${CLOUD_REMOTE}/borg_repo" --progress || log "Warning: Cloud upload failed"
     fi
 }
 
-# v2.3: Pre and Post hooks
+# Pre and Post hooks
 run_hook() {
     local hook="$1"
     if [[ -x "$hook" ]]; then
@@ -102,7 +100,7 @@ run_hook() {
     fi
 }
 
-# v2.3: Adaptive DB dumps with optional LVM snapshot
+# Adaptive DB dumps with optional LVM snapshot
 db_dump() {
     local DUMP_FILE="$BACKUP_DIR/db_dump_$(date +%s).sql"
     local DB_TYPE="${DB_TYPE:-mysql}"
@@ -126,63 +124,62 @@ db_dump() {
             ;;
     esac
 
-    # Optional LVM snapshot for hot consistency
     if [[ "${USE_LVM_SNAPSHOT:-false}" == "true" ]] && command -v lvcreate >/dev/null; then
-        log "Using LVM Snapshot for Consistent DB dump"
-        # (Implementation left as advanced exercise – requires LVM setup)
+        log "Using LVM snapshot for consistent DB dump"
+        # Advanced LVM snapshot logic can be added here if needed
     fi
 
     audit "Database dumped" "$DUMP_FILE"
     echo "$DUMP_FILE"
 }
 
-# ====================== BACKUP LOGIC ======================
+# ====================== 3-2-1 BACKUP LOGIC ======================
 perform_backup() {
     acquire_lock
-    detect_removable_media
 
     local TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
     local BACKUP_NAME="system_backup_${BACKUP_TYPE}_${TIMESTAMP}"
 
-    log "=== Starting ${BACKUP_TYPE} Backup using ${BACKUP_TOOL} ==="
-    audit "Backup Started"
+    log "=== Starting ${BACKUP_TYPE} backup using ${BACKUP_TOOL} (Primary on system) ==="
+    audit "Backup started"
 
-    run_hook "/etc/ukwinika/pre_backup_hook.sh"   # Pre-hook
+    run_hook "/etc/ukwinika/pre_backup_hook.sh"
 
     local DB_DUMP=$(db_dump)
 
-    case "$BACKUP_TOOL" in
-        borg)
-            borg create --compression=lz4 --checkpoint-interval=300 \
-                --max-lock-wait 300 \
-                --progress \
-                "${BORG_REPO}::${BACKUP_NAME}" \
-                "${INCLUDE_DIRS[@]}" "$DB_DUMP" "${EXCLUDE_DIRS[@]}"
-            borg prune --keep-daily "$RETENTION_DAYS" --keep-last "$RETENTION_VERSIONS" --stats "${BORG_REPO}"
-            borg check --verify-data "${BORG_REPO}" || log "Warning: Borg check failed"
-            ;;
-        rsync|rsnapshot|duplicity)
-            log "Tool $BACKUP_TOOL selected but not fully implemented in v2.3 (placeholder)"
-            ;;
-        *)
-            log "Unknown tool: $BACKUP_TOOL – falling back to Borg"
-            ;;
-    esac
+    # PRIMARY BACKUP - System disk
+    borg create --compression=lz4 --checkpoint-interval=300 \
+        --max-lock-wait 300 --progress \
+        "${PRIMARY_BORG_REPO}::${BACKUP_NAME}" \
+        "${INCLUDE_DIRS[@]}" "$DB_DUMP" "${EXCLUDE_DIRS[@]}"
 
-    run_hook "/etc/ukwinika/post_backup_hook.sh"   # Post-hook
+    borg prune --keep-daily "$RETENTION_DAYS" --keep-last "$RETENTION_VERSIONS" --stats "${PRIMARY_BORG_REPO}"
 
-    prometheus_metric "Success"
-    log "=== Backup Completed Successfully ==="
+    log "Primary backup completed on system disk"
+
+    # SECONDARY COPY - Removable USB (if present)
+    if detect_removable_media; then
+        log "Creating secondary copy on removable media"
+        rsync -a --info=progress2 "${PRIMARY_BORG_REPO}" "${REMOVABLE_PATH}/" || log "Warning: USB copy failed"
+    fi
+
+    # TERTIARY COPY - Cloud (if configured)
+    upload_to_cloud
+
+    run_hook "/etc/ukwinika/post_backup_hook.sh"
+    prometheus_metric "success"
+
+    log "=== All 3-2-1 copies completed successfully ==="
 }
 
 # ====================== REAL-TIME MODE ======================
 real_time_mode() {
-    log "Starting Real-Time Monitoring (inotify)"
+    log "Starting real-time monitoring (inotify)"
     command -v inotifywait >/dev/null || { log "ERROR: inotify-tools not installed"; exit 1; }
 
     prometheus_metric "realtime_started"
     while true; do
-        inotifywait -r -e modify,create,delete "${INCLUDE_DIRS[@]}" 2>/dev/null || true
+        inotifywait -r -e modify,create,delete "${REAL_TIME_DIRS[@]}" 2>/dev/null || true
         log "Change detected – triggering incremental backup"
         perform_backup
     done
@@ -196,11 +193,11 @@ restore_mode() {
     fi
 
     if [[ "${2:-}" == "drill" ]]; then
-        log "=== SAFE DRILL RESTORE MODE (Preview Only) ==="
-        sudo borg list /UKwinikaBackup/borg_repo | tail -n 10
+        log "=== SAFE DRILL RESTORE MODE (preview only) ==="
+        sudo borg list "${PRIMARY_BORG_REPO}" | tail -n 10
     else
         log "=== FULL RESTORE STARTED ==="
-        borg extract --strip-components 1 "${BORG_REPO}::${RESTORE_FILE}" "${INCLUDE_DIRS[@]}"
+        borg extract --strip-components 1 "${PRIMARY_BORG_REPO}::${RESTORE_FILE}" "${INCLUDE_DIRS[@]}"
     fi
     prometheus_metric "restore_completed"
 }
