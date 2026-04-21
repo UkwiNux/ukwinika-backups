@@ -1,5 +1,5 @@
 [Unit]
-Description=UKwinika Daily Backup Service (v2.4 - Full Featured)
+Description=UKwinika Daily Backup Service
 After=network.target remote-fs.target
 Wants=network-online.target
 
