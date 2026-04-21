@@ -1,6 +1,15 @@
 #!/bin/bash
-# Example pre-backup hook
-echo "$(date) Pre-backup hook started" >> /var/log/backup-hooks.log
-# Add custom actions: e.g., stop non-critical services, flush caches, etc.
-# Exit 0 to continue even if hook fails (script treats as non-fatal)
-exit 0
+# =============================================================================
+# UKwinika Pre-Backup Hook Example - v2.3
+# Place in /etc/ukwinika/pre_backup_hook.sh and make executable (chmod +x)
+# =============================================================================
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') [HOOK] Pre-backup hook started" >> /var/log/UKwinikaBackup.log
+
+# Example: Stop a service before backup (uncomment if needed)
+# systemctl stop your-service-name
+
+# Example: Notify via email or Slack
+echo "Pre-backup hook executed at $(date)" | mail -s "UKwinika Pre-Backup Hook" "$EMAIL_TO"
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') [HOOK] Pre-backup hook completed successfully" >> /var/log/UKwinikaBackup.log
