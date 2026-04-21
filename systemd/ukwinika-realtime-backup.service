@@ -1,9 +1,9 @@
 # =============================================================================
-# UKwinika Real-Time File Monitoring Service - v2.3
+# UKwinika Real-Time File Monitoring Service - v2.4
 # Uses inotify for instant backup on file changes
 # =============================================================================
 [Unit]
-Description=UKwinika Real-Time Backup Service (v2.3 - inotify monitoring)
+Description=UKwinika Real-Time Backup Service (v2.4 - inotify monitoring)
 After=network.target remote-fs.target
 Wants=network-online.target
 
