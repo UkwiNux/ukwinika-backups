@@ -1,14 +1,13 @@
 # =============================================================================
 # UKwinika Backup Configuration - v2.3
-# Copy to /etc/ukwinika-backup.conf and chmod 600
+# Copy this file to /etc/ukwinika-backup.conf and run: sudo chmod 600 /etc/ukwinika-backup.conf
 # =============================================================================
 
 # Backup settings
 BACKUP_DIR="/UKwinikaBackup"
-REMOVABLE_MOUNT="/media/usb"
 BORG_REPO="/UKwinikaBackup/borg_repo"
 
-# Which directories to back up
+# Directories to include/exclude
 INCLUDE_DIRS="/etc /home /var/www /var/lib/mysql /var/lib/postgresql /opt/oracle"
 EXCLUDE_DIRS="--exclude=/home/*/tmp --exclude=/var/cache --exclude=/proc --exclude=/sys --exclude=/dev"
 
@@ -18,7 +17,17 @@ RETENTION_VERSIONS=5
 
 # Database settings
 DB_TYPE="mysql"                    # mysql, postgresql, oracle
-USE_LVM_SNAPSHOT="false"           # Set to "true" if you have LVM volumes for hot snapshots
+USE_LVM_SNAPSHOT="false"           # Set to "true" if you have LVM volumes
+
+# Real-time monitoring
+REAL_TIME_DIRS=("/home" "/var/www")
+
+# Removable USB settings
+REMOVABLE_MOUNT="/media/usb"
+
+# Notification settings
+EMAIL_TO="sysadmin@example.com"
+SLACK_WEBHOOK=""
 
 # Hooks
 PRE_BACKUP_HOOK="/etc/ukwinika/pre_backup_hook.sh"
@@ -28,4 +37,4 @@ POST_BACKUP_HOOK="/etc/ukwinika/post_backup_hook.sh"
 PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
 
 # Other options
-STORAGE_THRESHOLD=80               # Percentage threshold for warnings
+STORAGE_THRESHOLD=80
