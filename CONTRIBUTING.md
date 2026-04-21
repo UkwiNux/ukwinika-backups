@@ -35,3 +35,15 @@ git clone https://github.com/UkwiNux/ukwinika-backups.git
 cd ukwinika-backups
 sudo make install
 sudo make systemd
+```
+
+### Coding Standards
+- Use `set -euo pipefail` at the top of scripts.
+- Add clear comments for new features.
+- Follow the existing function and logging style.
+- Keep changes backward-compatible when possible.
+
+### Questions?
+Open a [Discussion](https://github.com/UkwiNux/ukwinika-backups/discussions) or contact the maintainer.
+
+Thank you for helping make UKwinika better!
