@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Pre-Backup Hook Example - v2.3
+# UKwinika Pre-Backup Hook Example - v2.4
 # Place in /etc/ukwinika/pre_backup_hook.sh and make executable (chmod +x)
 # =============================================================================
 
