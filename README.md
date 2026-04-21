@@ -20,7 +20,7 @@
 - Improved Borg lock handling (`--max-lock-wait 300` + automatic stale lock breaker)
 - **Ansible Integration** for idempotent deployment and configuration management
 - Systemd timers + logrotate ready
-- Full Debian/Ubuntu auto-install support
+- Full Support for Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS
 
 ## Repository Structure
 ```bash
@@ -54,13 +54,13 @@ ukwinika-backups/
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
 cd ukwinika-backups
-sudo make install     # Auto-installs Borg + inotify-tools + Prometheus directory
+sudo make install    # Auto-detects Debian or RHEL and auto-installs dependencies Borg + inotify-tools + Prometheus directory
 sudo make systemd
 ```
 
 After installation, follow the **Full Installation & Setup** section below.
 
-## Full Installation & Setup
+## Full Installation & Setup (Debian or RHEL)
 
 1. **Clone the Repository**  
    ```bash
@@ -68,45 +68,51 @@ After installation, follow the **Full Installation & Setup** section below.
    cd ukwinika-backups
    ```
 
-2. **Install Script and Dependencies**  
+2. **Install Script and Dependencies**
+   The Makefile automatically detects your OS:
    ```bash
    sudo make install
    ```
 
-3. **Create Secure Passphrase File**  
+4. **Create Secure Passphrase File**  
    ```bash
    # Remember to set Your Pass Phrase here
    sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
    ```
 
-4. **Initialize Borg Repository**  
+5. **Initialize Borg Repository**  
    ```bash
    sudo mkdir -p /UKwinikaBackup
    sudo borg init --encryption=repokey /UKwinikaBackup/borg_repo
    ```
 
-5. **Configure the Script**  
+6. **Configure the Script**  
    ```bash
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
    sudo nano /etc/ukwinika-backup.conf
    ```
 
-6. **Deploy Systemd Services and Logrotate**  
+7. **Deploy Systemd Services and Logrotate**  
    ```bash
    sudo make systemd
    ```
 
-7. **Test the Backup**  
+8. **Test the Backup**  
    ```bash
    sudo enhanced_automated_backups.sh backup incremental borg
    ```
 
-8. **Enable Daily Automation**  
+9. **Enable Daily Automation**  
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    ```
+## RHEL-Specific Notes
+
+- The Makefile automatically enables the EPEL repository and installs borgbackup via dnf.
+- Ensure your system is registered with Red Hat Subscription Manager (or using Rocky/AlmaLinux) for full package access.
+
 ## Ansible Integration (v2.3)
 
 UKwinika EABS now includes native Ansible support for large-scale, idempotent deployments.
