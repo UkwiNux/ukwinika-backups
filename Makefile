@@ -3,7 +3,7 @@
 # Version: 2.3
 # Author: Urayayi Kwinika
 # Description: Handles installation, dependencies, and systemd deployment
-# Changes in v2.3: Added Prometheus directory creation + full feature notice
+# Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS Systems
 # =============================================================================
 
 .PHONY: install uninstall systemd clean deps
@@ -14,22 +14,27 @@ SYSTEMD_DIR=/etc/systemd/system
 LOGROTATE_DIR=/etc/logrotate.d
 PROMETHEUS_DIR=/var/lib/prometheus/node_exporter/custom
 
-# Install required packages automatically on Debian/Ubuntu
+# Detect OS and install required packages/dependencies automatically
 deps:
 	@if [ -f /etc/debian_version ] || [ -f /etc/lsb-release ]; then \
-		echo "🔧 Installing dependencies for Debian/Ubuntu..."; \
+		echo "🔧 Detected Debian/Ubuntu system..."; \
 		sudo apt update && sudo apt install -y borgbackup inotify-tools; \
-		echo "✅ BorgBackup + inotify-tools installed"; \
+		echo "✅ BorgBackup + inotify-tools installed (Debian)"; \
+	elif [ -f /etc/redhat-release ] || [ -f /etc/os-release ] && grep -qE 'rhel|rocky|alma|centos' /etc/os-release; then \
+		echo "🔧 Detected RHEL-based system (RHEL/Rocky/AlmaLinux/CentOS)..."; \
+		sudo dnf install -y epel-release || true; \
+		sudo dnf install -y borgbackup inotify-tools; \
+		echo "✅ BorgBackup + inotify-tools installed (RHEL)"; \
 	else \
-		echo "ℹ️ Non-Debian system — skipping auto-install"; \
+		echo "ℹ️ Unknown distribution — skipping auto-install. Please install borgbackup and inotify-tools manually."; \
 	fi
 
 # Main installation target
 install: deps
 	@sudo install -m 700 $(SCRIPT) $(INSTALL_DIR)/
 	@sudo mkdir -p $(PROMETHEUS_DIR)
-	@echo "✅ Script installed to $(INSTALL_DIR)/$(SCRIPT)"
-	@echo "✅ v2.3 full-featured version with real-time, restore, hooks, Prometheus, USB detection, and lock handling"
+	@echo "✅ Script Installed to $(INSTALL_DIR)/$(SCRIPT)"
+	@echo "✅ v2.3 Full-featured version with Real-Time, Restore, Hooks, Prometheus, USB Detection, and Lock Handling support & RHEL Compatibility"
 
 # Remove the script
 uninstall: 
