@@ -1,40 +1,48 @@
 # =============================================================================
-# UKwinika Backup Configuration - v2.4
-# Copy this file to /etc/ukwinika-backup.conf and run: sudo chmod 600 /etc/ukwinika-backup.conf
+# UKwinika Backup Configuration Example – v3.0 (idempotent edition)
+# Copy to /etc/ukwinika-backup.conf and adjust STRICTLY no secrets here.
 # =============================================================================
 
-# Backup settings
-BACKUP_DIR="/UKwinikaBackup"
-BORG_REPO="/UKwinikaBackup/borg_repo"
+# ---------- Borg repository path (primary copy) -----------------------------
+BORG_REPO="/var/backups/borg-repo"
 
-# Directories to include/exclude
-INCLUDE_DIRS="/etc /home /var/www /var/lib/mysql /var/lib/postgresql /opt/oracle"
-EXCLUDE_DIRS="--exclude=/home/*/tmp --exclude=/var/cache --exclude=/proc --exclude=/sys --exclude=/dev"
+# ---------- Paths to back up (array) ----------------------------------------
+# Default: entire root filesystem (excluding patterns below)
+BACKUP_PATHS=("/")
 
-# Retention policy
-RETENTION_DAYS=7
-RETENTION_VERSIONS=5
+# ---------- Exclude patterns (array) ----------------------------------------
+# These become `--exclude` arguments for Borg; no other location defines them.
+EXCLUDE_DIRS=(
+    "/proc" "/sys" "/dev" "/tmp" "/run" "/mnt" "/media" "/lost+found"
+    "/var/cache" "/var/tmp" "/home/*/.cache"
+)
 
-# Database settings
-DB_TYPE="mysql"                    # mysql, postgresql, oracle
-USE_LVM_SNAPSHOT="false"           # Set to "true" if you have LVM volumes
+# ---------- Retention -------------------------------------------------------
+RETENTION_DAYS=90             # keep all archives within this many days
+RETENTION_VERSIONS=5          # minimum number of versions to keep
 
-# Real-time monitoring
-REAL_TIME_DIRS=("/home" "/var/www")
+# ---------- USB off‑site copy (secondary) -----------------------------------
+USB_MOUNT="/mnt/backup_usb"               # mount point
+USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"   # destination folder on USB
 
-# Removable USB settings
-REMOVABLE_MOUNT="/media/usb"
+# ---------- Cloud upload (tertiary) -----------------------------------------
+# rclone remote name and path, e.g. "s3:my-borg-backups"
+CLOUD_REMOTE=""
 
-# Notification settings
-EMAIL_TO="sysadmin@example.com"
-SLACK_WEBHOOK=""
+# ---------- Database dump ---------------------------------------------------
+DB_TYPE="none"                 # none, mysql, postgresql, mongodb
 
-# Hooks
-PRE_BACKUP_HOOK="/etc/ukwinika/pre_backup_hook.sh"
-POST_BACKUP_HOOK="/etc/ukwinika/post_backup_hook.sh"
+# ---------- Hooks -----------------------------------------------------------
+PRE_HOOK="/etc/ukwinika/pre_backup_hook.sh"
+POST_HOOK="/etc/ukwinika/post_backup_hook.sh"
+HOOK_FAIL_ACTION="fatal"      # fatal (stop) or warn (continue)
 
-# Prometheus metrics (optional)
+# ---------- Real‑time monitoring directories --------------------------------
+REAL_TIME_DIRS=("/etc" "/home")
+
+# ---------- Notification recipients (non‑secret) ---------------------------
+EMAIL_TO="admin@example.com"
+
+# ---------- Prometheus metrics ----------------------------------------------
+METRICS_ENABLED="yes"
 PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
-
-# Other options
-STORAGE_THRESHOLD=80
