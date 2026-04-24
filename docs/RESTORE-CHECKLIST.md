@@ -1,22 +1,25 @@
-# UKwinika Backup – Monthly Restore Drill Checklist
+# UKwinika Backup – Monthly Restore Drill Checklist (v3.0)
 
 **Purpose**: Verify that backups are restorable and data is intact.  
 **Frequency**: At least once per month (or after any major change).
 
-### 1. Preparation
-- Use a non-production test server or isolated VM.
-- Confirm you have the encryption passphrase (or Borg repo key).
-- Ensure the target restore location has enough free disk space.
-- Back up current critical data on the test system (just in case).
-
-### 2. Select Backup
-- List available archives:  
-  `sudo borg list /UKwinikaBackup/borg_repo` (or `ls -l /UKwinikaBackup`)
-- Choose the most recent successful backup (cross-check with audit log).
-
-### 3. Run Restore in Drill Mode (Recommended)
+### 1. Select an Archive
 ```bash
-sudo enhanced_automated_backups.sh restore drill borg <archive_name>
+sudo enhanced_automated_backups.sh list
 ```
 
-Note: Files will be restored to: `/tmp/restore_drill_<timestamp>`
+### 2. Restore to a Test Location (Drill)
+```bash
+sudo enhanced_automated_backups.sh restore <archive_name> /tmp/restore_drill
+```
+Files are now safely extracted to `/tmp/restore_drill` – this can be repeated without harm.
+
+### 3. Verify Integrity
+```bash
+diff -rq /original/path /tmp/restore_drill/original/path
+```
+
+### 4. Clean Up
+```bash
+rm -rf /tmp/restore_drill
+```
