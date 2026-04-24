@@ -1,16 +1,15 @@
 [Unit]
-Description=UKwinika Daily Backup Service
-After=network.target remote-fs.target
+Description=UKwinika Daily Idempotent Backup (v3.0)
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/enhanced_automated_backups.sh backup incremental borg
-EnvironmentFile=-/etc/ukwinika-backup.conf
+# Config and secrets paths are injected as environment variables
+Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
+Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
+ExecStart=/usr/local/bin/enhanced_automated_backups.sh backup
 User=root
-
-# Nice level and I/O priority for production use
-Nice=10
-IOSchedulingClass=best-effort
-IOSchedulingPriority=7
+Nice=19
+IOSchedulingClass=idle
 PrivateTmp=true
