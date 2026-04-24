@@ -1,25 +1,22 @@
-# UKwinika Enhanced Automated Backup Script [EABS]
+# UKwinika Enhanced Automated Backup Script [EABS v3.0]
 
 **A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support & Cloud Backup Support.
 
+**A Smart, Idempotent 3‑2‑1 Backup Solution for Linux**
+
+**Version:** 3.0  
 **Author:** Urayayi Kwinika  
-**Version:** 2.4  
-**Last Updated:** April 2026  
 **License:** MIT
 
-## Features (Fully Implemented in v2.4)
+## Features 
+- **Fully idempotent**: safe to run multiple times without side effects.
 - Backup modes: `backup`, `real-time` (inotify), `restore` (with safe drill mode)
 - Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
 - 3-2-1 Backup Principle: Primary on System, Secondary on Removable USB, Tertiary on Cloud
-- Optional tools: rsync, rsnapshot, duplicity (ready for expansion)
-- Adaptive DB dumps (MySQL, PostgreSQL, Oracle) with optional LVM snapshots
 - Pre/post backup hooks
-- Prometheus metrics export
 - Removable USB auto-detection
-- Concurrency locking with `flock`
+- **Stale Lock Prevention** – lock file is automatically removed on exit.
 - Detailed audit trail with SHA256 checksums
-- Improved Borg lock handling (`--max-lock-wait 300` + automatic stale lock breaker)
-- **Ansible Integration** for idempotent deployment and configuration management
 - Systemd timers + logrotate ready
 - Full Support for Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS
 
@@ -47,7 +44,6 @@ ukwinika-backups/
 ├── .github/
 │   └── workflows/
 │       └── test.yml
-└── CONTRIBUTING.md
 ```
 
 ## Quick Start – Clone from GitHub (Recommended for Latest Version)
@@ -55,57 +51,47 @@ ukwinika-backups/
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
 cd ukwinika-backups
-sudo make install    # Auto-detects Debian or RHEL and auto-installs dependencies Borg + inotify-tools + Prometheus directory
+sudo make install
 sudo make systemd
+
+# Then edit config and secrets, initialise Borg repo, and test.
 ```
 
-After installation, follow the **Full Installation & Setup** section below.
+After installation, follow the **Setup** section below.
 
-## Full Installation & Setup (Debian or RHEL)
+## Setup (Debian or RHEL)
 
-1. **Clone the Repository**  
-   ```bash
-   git clone https://github.com/UkwiNux/ukwinika-backups.git
-   cd ukwinika-backups
-   ```
-
-2. **Install Script and Dependencies**
-   The Makefile automatically detects your OS:
-   ```bash
-   sudo make install
-   ```
-
-4. **Create Secure Passphrase File**  
+1. **Create Secure Passphrase File**  
    ```bash
    # Remember to set Your Pass Phrase here
    sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
    ```
 
-5. **Initialize Borg Repository**  
+2. **Initialize Borg Repository**  
    ```bash
    sudo mkdir -p /UKwinikaBackup
    sudo borg init --encryption=repokey /UKwinikaBackup/borg_repo
    ```
 
-6. **Configure the Script**  
+3. **Configure the Script**  
    ```bash
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
    sudo nano /etc/ukwinika-backup.conf
    ```
 
-7. **Deploy Systemd Services and Logrotate**  
+4. **Deploy Systemd Services and Logrotate**  
    ```bash
    sudo make systemd
    ```
 
-8. **Test the Backup**  
+5. **Test the Backup**  
    ```bash
    sudo enhanced_automated_backups.sh backup incremental borg
    ```
 
-9. **Enable Daily Automation**  
+6. **Enable Daily Automation**  
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    ```
@@ -114,7 +100,7 @@ After installation, follow the **Full Installation & Setup** section below.
 - The Makefile automatically enables the EPEL repository and installs borgbackup via dnf.
 - Ensure your system is registered with Red Hat Subscription Manager (or using Rocky/AlmaLinux) for full package access.
 
-## Ansible Integration (v2.4)
+## Ansible Integration 
 
 UKwinika EABS now includes native Ansible support for large-scale, idempotent deployments.
 
@@ -134,7 +120,7 @@ Key Ansible features:
 - Optional inventory-based passphrase and config management
 - Role variables for customizing DB_TYPE, retention, real-time directories, etc.
 
-See the `ansible/` directory (planned for v2.5) or use the current Makefile for manual Ansible integration.
+See the `ansible/` directory or use the current Makefile for manual Ansible integration.
 
 The script automatically follows the 3-2-1 backup rule:
 - After the primary Borg backup completes on the system disk, it will:
@@ -190,7 +176,7 @@ EOF'
 sudo chmod 600 /root/.my.cnf
 ```
 ## Troubleshooting
-- **Borg lock timeout** → Fixed in v2.4 (automatic stale lock breaker)
+- **Borg lock timeout** 
 - **Real-time monitoring not working** → Ensure `inotify-tools` is installed
 - **MySQL access denied** → Use the `.my.cnf` fix above
 - **Passphrase prompt** → Verify `/etc/ukwinika-backup.secrets`
