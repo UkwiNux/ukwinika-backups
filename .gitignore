@@ -8,10 +8,13 @@ ukwinika-backup.conf
 /temp_*
 /*.gpg
 
-# Logs (Do not Commit live logs)
+# Logs (Do not commit live logs)
 *.log
 
 # Editor Files
 .vscode/
 .idea/
 *.swp
+
+# OS files
+.DS_Store
