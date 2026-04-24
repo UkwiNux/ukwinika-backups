@@ -1,15 +1,17 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Pre-Backup Hook Example - v2.4
+# UKwinika Pre-Backup Hook – v3.0
 # Place in /etc/ukwinika/pre_backup_hook.sh and make executable (chmod +x)
+# This script is sourced by the main backup – use $? to check previous steps.
 # =============================================================================
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') [HOOK] Pre-backup hook started" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Pre-backup hook started" >> /var/log/UKwinikaBackup.log
 
-# Example: Stop a service before backup (uncomment if needed)
-# systemctl stop your-service-name
+# Example: stop a service
+# systemctl stop apache2
 
-# Example: Notify via email or Slack
-echo "Pre-backup hook executed at $(date)" | mail -s "UKwinika Pre-Backup Hook" "$EMAIL_TO"
+# Example: flush database logs
+# mysql -e "FLUSH LOGS;"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') [HOOK] Pre-backup hook completed successfully" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Pre-backup hook completed" >> /var/log/UKwinikaBackup.log
+exit 0
