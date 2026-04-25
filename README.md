@@ -99,7 +99,7 @@ After installation, follow the **Setup** section below.
    sudo systemctl enable --now ukwinika-backup.timer
    ```
    
-7. ** Enable Real-Time monitoring**
+7. **Enable Real-Time monitoring**
    ```bash
     sudo systemctl start ukwinika-realtime-backup.service
    ```
