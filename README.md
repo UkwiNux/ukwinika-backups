@@ -66,6 +66,7 @@ After installation, follow the **Setup** section below.
    # Remember to set Your Pass Phrase here
    sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
+   sudo nano /etc/ukwinika-backup.secrets
    ```
 
 2. **Initialize Borg Repository**  
@@ -79,6 +80,7 @@ After installation, follow the **Setup** section below.
    sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
    sudo chmod 600 /etc/ukwinika-backup.secrets
    sudo nano /etc/ukwinika-backup.secrets
+   
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
    sudo nano /etc/ukwinika-backup.conf
