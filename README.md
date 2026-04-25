@@ -71,11 +71,11 @@ After installation, follow the **Setup** section below.
 
 2. **Initialize Borg Repository**  
    ```bash
-   # Option A: Use the script’s new `init` command
+   # Option A: Use the Script’s `init` command
    sudo enhanced_automated_backups.sh init
 
    # Option B: Manual – just as effective
-   sudo borg init --encryption=repokey /var/UKwinikaBackup/borg-repo
+   sudo borg init --encryption=repokey /var/UKwinikaBackup/borg_repo
    ```
 
 3. **Configure the Script**  
