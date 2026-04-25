@@ -76,6 +76,9 @@ After installation, follow the **Setup** section below.
 
 3. **Configure the Script**  
    ```bash
+   sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
+   sudo chmod 600 /etc/ukwinika-backup.secrets
+   sudo nano /etc/ukwinika-backup.secrets
    sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
    sudo chmod 600 /etc/ukwinika-backup.conf
    sudo nano /etc/ukwinika-backup.conf
