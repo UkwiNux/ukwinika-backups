@@ -43,7 +43,7 @@ fi
 BORG_PASSPHRASE="${BORG_PASSPHRASE:?}"
 export BORG_PASSPHRASE
 
-BORG_REPO="${BORG_REPO:-/var/backups/borg-repo}"
+BORG_REPO="${BORG_REPO:-/var/UKwinikaBackup/borg_repo}"
 BACKUP_PATHS=("${BACKUP_PATHS[@]:-/}")
 EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:-/proc /sys /dev /tmp /run /mnt /media /lost+found}")
 
