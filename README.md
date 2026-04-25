@@ -98,6 +98,12 @@ After installation, follow the **Setup** section below.
    ```bash
    sudo systemctl enable --now ukwinika-backup.timer
    ```
+   
+7. ** Enable Real-Time monitoring**
+   ```bash
+    sudo systemctl start ukwinika-realtime-backup.service
+   ```
+   
 ## RHEL-Specific Notes
 
 - The Makefile automatically enables the EPEL repository and installs borgbackup via dnf.
@@ -137,17 +143,6 @@ The script automatically follows the 3-2-1 backup rule:
   
 Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
 
-## How to Restore a File or Folder
-
-**Using the script (recommended):**
-```bash
-# Safe drill mode (preview only)
-sudo enhanced_automated_backups.sh restore drill borg system_backup_incremental_20260420_125524
-
-# Full restore
-sudo enhanced_automated_backups.sh restore full borg system_backup_incremental_20260420_125524
-```
-
 **Manual Borg commands:**
 ```bash
 sudo borg list /UKwinikaBackup/borg_repo
@@ -166,7 +161,6 @@ Always test Restores regularly using the commands above.
 ## Usage Examples
 - Incremental backup: `sudo enhanced_automated_backups.sh backup incremental borg`
 - Full backup: `sudo enhanced_automated_backups.sh backup full borg`
-- Real-time monitoring: `sudo systemctl start ukwinika-realtime-backup.service`
 - View logs: `sudo tail -f /var/log/UKwinikaBackup.log`
 
 ## MySQL / Database Fix (Debian)
