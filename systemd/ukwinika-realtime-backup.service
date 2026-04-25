@@ -1,5 +1,7 @@
+ini
+
 [Unit]
-Description=UKwinika Real-Time Backup Monitoring (v3.0)
+Description=UKwinika Real-Time Backup Monitoring
 After=network.target remote-fs.target
 Wants=network-online.target
 
@@ -8,9 +10,14 @@ Type=simple
 Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
 Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
 ExecStart=/usr/local/bin/enhanced_automated_backups.sh real-time
-Restart=always
+Restart=on-failure
 RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
 User=root
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
+
+[Install]
+WantedBy=multi-user.target
