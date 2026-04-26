@@ -23,6 +23,6 @@ jobs:
           export BORG_PASSPHRASE=test
           export BORG_REPO=$(mktemp -d)
           bash enhanced_automated_backups.sh list 2>/dev/null || true
-          echo "✅ Basic validation passed"
+          echo "✅ Basic Validation Passed"
       - name: Check example config exists
         run: test -f config/ukwinika-backup.conf.example
