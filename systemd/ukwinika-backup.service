@@ -1,5 +1,5 @@
 [Unit]
-Description=UKwinika Daily Idempotent Backup (v3.0)
+Description=UKwinika Daily Idempotent Backup
 After=network-online.target
 Wants=network-online.target
 
