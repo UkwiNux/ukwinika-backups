@@ -21,7 +21,7 @@ UKwinika Enhanced Automated Backup Script strictly follows the 3-2-1 Backup Rule
 
 | Copy | Location                  | Purpose                     | Triggered When |
 |------|---------------------------|-----------------------------|----------------|
-| 1    |`/UKwinikaBackup/borg_repo`| Primary (system disk)       | Always         |
+| 1    |`/UKwinikaBackup/borg-repo`| Primary (system disk)       | Always         |
 | 2    | Removable USB             | Secondary (local)           | USB detected   |
 | 3    | Cloud (rclone)            | Tertiary (off-site)         |`CLOUD_REMOTE` defined |
 
@@ -52,7 +52,7 @@ Key new parameters:
 
 ## 6. Backup Storage & 3-2-1 Flow
 
-- Primary backup is **always** written to `/UKwinikaBackup/borg_repo`
+- Primary backup is **always** written to `/UKwinikaBackup/borg-repo`
 - After successful primary backup:
   - If removable media is detected → secondary copy is made via `rsync`
   - If `CLOUD_REMOTE` is configured → tertiary copy is uploaded via `rclone`
