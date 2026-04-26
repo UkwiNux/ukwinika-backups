@@ -5,7 +5,7 @@
 # This script is sourced by the main backup – use $? to check previous steps.
 # =============================================================================
 
-echo "$(date '+%F %T') [HOOK] Pre-backup hook started" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Pre-Backup Hook Started" >> /var/log/UKwinikaBackup.log
 
 # Example: stop a service
 # systemctl stop apache2
@@ -13,5 +13,5 @@ echo "$(date '+%F %T') [HOOK] Pre-backup hook started" >> /var/log/UKwinikaBacku
 # Example: flush database logs
 # mysql -e "FLUSH LOGS;"
 
-echo "$(date '+%F %T') [HOOK] Pre-backup hook completed" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Pre-Backup Hook Completed" >> /var/log/UKwinikaBackup.log
 exit 0
