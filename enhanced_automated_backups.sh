@@ -42,7 +42,7 @@ fi
 BORG_PASSPHRASE="${BORG_PASSPHRASE:?}"
 export BORG_PASSPHRASE
 
-BORG_REPO="${BORG_REPO:-/var/backups/borg-repo}"
+BORG_REPO="${BORG_REPO:-/UKwinikaBackup/borg_repo}"
 BACKUP_PATHS=("${BACKUP_PATHS[@]:-/}")
 EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:-/proc /sys /dev /tmp /run /mnt /media /lost+found}")
 
@@ -73,7 +73,7 @@ die()  { log "FATAL: $*"; exit 1; }
 # ---- Locking ----
 exec 200>"$LOCK_FILE"
 if ! flock -n 200; then
-    log "Another Backup instance is already running. Exiting."
+    log "Another Backup Instance is already running. Exiting."
     exit 0
 fi
 cleanup_lock() {
@@ -107,16 +107,16 @@ db_dump() {
         mysql)
             log "Dumping all MySQL Databases..."
             mysqldump --all-databases --single-transaction --quick --lock-tables=false \
-                > "$dump_dir/mysql-all.sql" || die "MySQL dump failed"
+                > "$dump_dir/mysql-all.sql" || die "MySQL Dump failed"
             ;;
         postgresql)
             log "Dumping all PostgreSQL Databases..."
             sudo -u postgres pg_dumpall > "$dump_dir/postgresql-all.sql" \
-                || die "PostgreSQL dump failed"
+                || die "PostgreSQL Dump failed"
             ;;
         mongodb)
             log "Dumping MongoDB..."
-            mongodump --out "$dump_dir/mongo" || die "MongoDB dump failed"
+            mongodump --out "$dump_dir/mongo" || die "MongoDB Dump failed"
             ;;
         *)
             die "Unsupported DB_TYPE='$DB_TYPE'. Aborting for Data Safety."
@@ -135,7 +135,7 @@ borg_backup() {
         exclude_args+=(--exclude "$dir")
     done
 
-    log "Creating Borg archive '$archive_name'..."
+    log "Creating Borg Archive '$archive_name'..."
     borg create                          \
         --verbose                        \
         --filter AME                     \
@@ -175,13 +175,13 @@ sync_to_usb() {
 
 cloud_upload() {
     if [[ -n "$CLOUD_REMOTE" ]] && command -v rclone >/dev/null; then
-        log "Uploading to cloud: $CLOUD_REMOTE"
+        log "Uploading to Cloud: $CLOUD_REMOTE"
         rclone copy "$BORG_REPO" "${CLOUD_REMOTE}/borg_repo" --progress || log "WARNING: Cloud upload failed"
     fi
 }
 
 audit_checksum() {
-    log "Generating SHA256 checksums of repository..."
+    log "Generating SHA256 checksums of Repository..."
     find "$BORG_REPO" -type f -exec sha256sum {} + > /tmp/ukwinika-backup-checksums.txt
     audit "Checksums saved to /tmp/ukwinika-backup-checksums.txt"
 }
@@ -227,7 +227,7 @@ restore_backup() {
     log "Restoring Archive '$archive' to '$target'..."
     mkdir -p "$target"
     borg extract "$BORG_REPO"::"$archive" --target "$target" || die "Restore failed"
-    log "Restore Completed successfully to $target"
+    log "Restore Completed Successfully to $target"
 }
 
 list_archives() {
@@ -287,7 +287,7 @@ case "${1:-}" in
         log "Initialising new Borg Repository at $BORG_REPO"
         mkdir -p "$(dirname "$BORG_REPO")"
         borg init --encryption=repokey "$BORG_REPO" || die "Borg init failed"
-        log "Repository initialised successfully."
+        log "Repository Initialised Successfully."
         ;;
     *)
         echo "Usage: $0 {backup|restore <archive> [target]|list|check|real-time|init}"
