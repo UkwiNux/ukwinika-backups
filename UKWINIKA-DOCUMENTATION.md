@@ -1,8 +1,7 @@
 # UKwinika Enhanced Automated Backup Script
-**UKwinika Enhanced Automated Backup Script Documentation – Version 2.4**
+**UKwinika Enhanced Automated Backup Script Documentation**
 
 **Author:** Urayayi Kwinika  
-**Version:** 2.4  
 **Date:** April 2026  
 **License:** MIT
 
@@ -12,7 +11,7 @@ UKwinika Enhanced Automated Backup Script is a light open-source, automated back
 
 The script is fully compatible with Debian, Ubuntu, RHEL, Rocky Linux, AlmaLinux, and CentOS Stream.
 
-## 2. 3-2-1 Backup Principle (New in v2.4)
+## 2. 3-2-1 Backup Principle 
 
 UKwinika Enhanced Automated Backup Script strictly follows the 3-2-1 Backup Rule:
 
@@ -47,7 +46,7 @@ See the main `README.md` for step-by-step instructions.
 
 ## 5. Configuration ( `/etc/ukwinika-backup.conf` )
 
-Key new parameters in v2.4:
+Key new parameters:
 - `REMOVABLE_MOUNT` – Path for secondary USB copy
 - `CLOUD_REMOTE` – rclone remote for tertiary cloud copy (e.g., `s3:mybucket`)
 
