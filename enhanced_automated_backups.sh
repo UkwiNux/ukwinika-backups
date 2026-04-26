@@ -42,7 +42,7 @@ fi
 BORG_PASSPHRASE="${BORG_PASSPHRASE:?}"
 export BORG_PASSPHRASE
 
-BORG_REPO="${BORG_REPO:-/UKwinikaBackup/borg_repo}"
+BORG_REPO="${BORG_REPO:-/UKwinikaBackup/borg-repo}"
 BACKUP_PATHS=("${BACKUP_PATHS[@]:-/}")
 EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:-/proc /sys /dev /tmp /run /mnt /media /lost+found}")
 
@@ -85,9 +85,9 @@ trap cleanup_lock EXIT INT TERM
 run_hook() {
     local hook="$1"
     if [[ -n "$hook" && -x "$hook" ]]; then
-        log "Running hook: $hook"
+        log "Running Hook: $hook"
         if "$hook"; then
-            log "Hook succeeded: $hook"
+            log "Hook Succeeded: $hook"
         else
             if [[ "$HOOK_FAIL_ACTION" == "fatal" ]]; then
                 die "Hook '$hook' failed"
