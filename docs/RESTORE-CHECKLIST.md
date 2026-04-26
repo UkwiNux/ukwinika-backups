@@ -1,4 +1,4 @@
-# UKwinika Backup – Monthly Restore Drill Checklist (v3.0)
+# UKwinika Backup – Monthly Restore Drill Checklist
 
 **Purpose**: Verify that backups are restorable and data is intact.  
 **Frequency**: At least once per month (or after any major change).
