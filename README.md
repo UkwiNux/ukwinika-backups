@@ -26,7 +26,7 @@ ukwinika-backups/
 ├── LICENSE
 ├── .gitignore
 ├── Makefile                  
-├── enhanced_automated_backups.sh       # Main production script (v2.3)
+├── enhanced_automated_backups.sh       
 ├── config/
 │   └── ukwinika-backup.conf.example
 ├── systemd/
