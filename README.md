@@ -197,9 +197,6 @@ ls /mnt/borg-restore
 
 sudo borg umount /mnt/borg-restore
 ```
-
-> **Remember:** A backup is only as good as its last successful restore. Test regularly.
-
 ---
 
 ## Database Support
@@ -228,7 +225,6 @@ sudo chmod 600 /root/.my.cnf
 | Passphrase prompt during backup | Secrets file missing or incorrect permissions | Ensure `/etc/ukwinika-backup.secrets` exists, is mode `0600`, and contains `BORG_PASSPHRASE` |
 
 ---
-
 ## Security & Best Practices
 
 - The passphrase and any webhook/email credentials live exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`).
@@ -236,17 +232,13 @@ sudo chmod 600 /root/.my.cnf
 - The script uses file locking (`flock`) to prevent concurrent executions.
 - Rotate logs with the provided logrotate configuration.
 - Run monthly restore drills using the checklist in `docs/RESTORE-CHECKLIST.md`.
-
 ---
-
 ## RHEL‑Specific Notes
 
 - The `Makefile` enables the EPEL repository and installs `borgbackup` via `dnf`.
 - Make sure your system is subscribed (RHEL) or that you are using a compatible derivative (Rocky, AlmaLinux, CentOS).
-
 ---
-
-**UKwinika Notable Advice: A Backup is Only as Good as its Last Successful Restore.**
+> **UKwinika Notable Advice: Remember A Backup is Only as Good as its Last Successful Restore. Test Regularly.**
 
 ## License
 
