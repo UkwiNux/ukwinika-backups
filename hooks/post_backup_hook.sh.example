@@ -4,15 +4,15 @@
 # Place in /etc/ukwinika/post_backup_hook.sh and make executable (chmod +x)
 # =============================================================================
 
-echo "$(date '+%F %T') [HOOK] Post-backup hook started" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Post-Backup Hook Started" >> /var/log/UKwinikaBackup.log
 
 # Example: restart a service
 # systemctl start apache2
 
 # Example: send a simple Slack message (webhook from secrets)
 # if [ -n "$SLACK_WEBHOOK" ]; then
-#    curl -X POST -H 'Content-type: application/json' --data '{"text":"✅ Backup completed"}' "$SLACK_WEBHOOK"
+#    curl -X POST -H 'Content-type: application/json' --data '{"text":"✅ Backup Completed"}' "$SLACK_WEBHOOK"
 # fi
 
-echo "$(date '+%F %T') [HOOK] Post-backup hook completed" >> /var/log/UKwinikaBackup.log
+echo "$(date '+%F %T') [HOOK] Post-Backup Hook Completed" >> /var/log/UKwinikaBackup.log
 exit 0
