@@ -3,14 +3,14 @@
 # Copy to /etc/ukwinika-backup.conf and adjust STRICTLY no secrets here.
 # =============================================================================
 
-# ---------- Borg repository path (primary copy) -----------------------------
+# ---------- Borg Repository Path (Primary Copy) -----------------------------
 BORG_REPO="/UKwinikaBackup/borg-repo"
 
-# ---------- Paths to back up (array) ----------------------------------------
+# ---------- Paths to Back Up (Array) ----------------------------------------
 # Default: entire root filesystem (excluding patterns below)
 BACKUP_PATHS=("/")
 
-# ---------- Exclude patterns (array) ----------------------------------------
+# ---------- Exclude Patterns (Array) ----------------------------------------
 # These become `--exclude` arguments for Borg; no other location defines them.
 EXCLUDE_DIRS=(
     "/proc" "/sys" "/dev" "/tmp" "/run" "/mnt" "/media" "/lost+found"
@@ -21,15 +21,15 @@ EXCLUDE_DIRS=(
 RETENTION_DAYS=90             # keep all archives within this many days
 RETENTION_VERSIONS=5          # minimum number of versions to keep
 
-# ---------- USB off‑site copy (secondary) -----------------------------------
+# ---------- USB Off‑Site copy (Secondary) -----------------------------------
 USB_MOUNT="/mnt/backup_usb"               # mount point
 USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"   # destination folder on USB
 
-# ---------- Cloud upload (tertiary) -----------------------------------------
+# ---------- Cloud Upload (Tertiary) -----------------------------------------
 # rclone remote name and path, e.g. "s3:my-borg-backups"
 CLOUD_REMOTE=""
 
-# ---------- Database dump ---------------------------------------------------
+# ---------- Database Dump ---------------------------------------------------
 DB_TYPE="none"                 # none, mysql, postgresql, mongodb
 
 # ---------- Hooks -----------------------------------------------------------
@@ -37,12 +37,12 @@ PRE_HOOK="/etc/ukwinika/pre_backup_hook.sh"
 POST_HOOK="/etc/ukwinika/post_backup_hook.sh"
 HOOK_FAIL_ACTION="fatal"      # fatal (stop) or warn (continue)
 
-# ---------- Real‑time monitoring directories --------------------------------
+# ---------- Real‑Time Monitoring Directories --------------------------------
 REAL_TIME_DIRS=("/etc" "/home")
 
-# ---------- Notification recipients (non‑secret) ---------------------------
+# ---------- Notification Recipients (Non‑Secret) ---------------------------
 EMAIL_TO="admin@example.com"
 
-# ---------- Prometheus metrics ----------------------------------------------
+# ---------- Prometheus Metrics ----------------------------------------------
 METRICS_ENABLED="yes"
 PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
