@@ -74,7 +74,7 @@ After installation, follow the **Setup** section below.
    sudo enhanced_automated_backups.sh init
 
    # Option B: Manual – just as effective
-   sudo borg init --encryption=repokey /var/backups/borg-repo
+   sudo borg init --encryption=repokey /UKwinikaBackup/borg_repo
    ```
 
 3. **Configure the Script**  
@@ -141,7 +141,7 @@ The script automatically follows the 3-2-1 backup rule:
    - Upload the new archive to the cloud if `CLOUD_REMOTE` is set in the config
      
 ## Where Backups Are Stored (3-2-1 Principle)
-- Primary copy (always): `/var/backups/borg-repo` (system disk)
+- Primary copy (always): `/UKwinikaBackup/borg_repo` (system disk)
 - Secondary copy (if USB detected): `/media/usb` or configured `REMOVABLE_MOUNT`
 - Tertiary copy (if configured): Cloud storage via `rclone`
   
@@ -149,14 +149,14 @@ Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or
 
 **Manual Borg commands:**
 ```bash
-sudo borg list /var/backups/borg-repo
-sudo borg extract --strip-components 1 /var/backups/borg-repo::ARCHIVE_NAME path/to/file-or-folder
+sudo borg list /UKwinikaBackup/borg_repo
+sudo borg extract --strip-components 1 /UKwinikaBackup/borg_repo::ARCHIVE_NAME path/to/file-or-folder
 ```
 
 **Browse mode:**
 ```bash
 sudo mkdir -p /mnt/borg-restore
-sudo borg mount /var/backups/borg-repo /mnt/borg-restore
+sudo borg mount /UKwinikaBackup/borg_repo /mnt/borg-restore
 ls /mnt/borg-restore
 sudo borg umount /mnt/borg-restore
 ```
