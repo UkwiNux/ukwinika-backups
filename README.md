@@ -1,32 +1,40 @@
-# UKwinika Enhanced Automated Backup Script [EABS]
+# UKwinika Enhanced Automated Backup Script (EABS)
 
-**A 3‑2‑1 Backup Strategy Solution** with Borg, Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media & Cloud Backup Support.
+**A 3‑2‑1 Backup Solution** with Borg, Real-time Monitoring, Database Consistency, Encryption, Auditing, and Cloud Support.
 
 **Author:** Urayayi Kwinika  
+**Version:** 3.1  
 **License:** MIT
 
-## Features 
-- **Fully Idempotent**: safe to run multiple times without side effects.
-- Backup Modes: `backup`, `real-time` (inotify), `restore` (with Safe Drill Mode)
-- Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
-- 3-2-1 Backup Principle: Primary on System, Secondary on Removable USB, Tertiary on Cloud
-- Pre/Post Backup Hooks
-- Removable USB Auto-Detection
-- **Stale Lock Prevention** – Lock File is automatically removed on exit.
-- Detailed Audit Trail with SHA256 checksums
-- Systemd Timers + Logrotate ready
-- Full Support for Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS
+---
+
+## Features
+
+- **Fully Idempotent** – Safe to run any number of times without side effects.
+- **3‑2‑1 Backup Principle** – Primary on Disk, Secondary on Removable USB, Tertiary to Cloud.
+- **BorgBackup** – Deduplication, AES‑256 Encryption, Compression, and Mountable Archives.
+- **Restore with Safe Drill Mode** – test restores easily without overwriting live data.
+- **Real‑time Monitoring** (inotify) – instant backups on file changes.
+- **Database‑aware** – adaptive dumps for MySQL, PostgreSQL, and MongoDB.
+- **Pre/Post Hooks** – custom scripts before and after each backup.
+- **Prometheus Metrics** – monitor backups with a simple metric endpoint.
+- **Audit Trail** – SHA256 checksums logged after every backup.
+- **Stale Lock Prevention** – lock file is automatically removed on exit.
+- **Systemd & Logrotate** – ready for automatic, scheduled execution and log rotation.
+- **Cross‑distribution Support** – Debian, Ubuntu, RHEL, Rocky, AlmaLinux, CentOS.
+---
 
 ## Repository Structure
-```bash
+```
 ukwinika-backups/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
-├── Makefile                  
-├── enhanced_automated_backups.sh       
+├── Makefile
+├── enhanced_automated_backups.sh          # Main backup script
 ├── config/
-│   └── ukwinika-backup.conf.example
+│   ├── ukwinika-backup.conf.example       # Configuration template
+│   └── ukwinika-backup.secrets.example    # Secrets template
 ├── systemd/
 │   ├── ukwinika-backup.service
 │   ├── ukwinika-backup.timer
@@ -38,131 +46,167 @@ ukwinika-backups/
 ├── hooks/
 │   ├── pre_backup_hook.sh.example
 │   └── post_backup_hook.sh.example
-├── .github/
-│   └── workflows/
-│       └── test.yml
+└── .github/
+    └── workflows/
+        └── test.yml
 ```
 
-## Quick Start – Clone from GitHub 
+---
+
+## Quick Start
 
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
+
+cd ukwinika-backups
+
+sudo make install        # Installs script and dependencies
+
+sudo make systemd        # Deploys systemd units and logrotate
+```
+
+Then follow the **Setup** steps below to configure and initialise the repository.
+
+---
+
+## Full Setup (Debian / RHEL)
+
+Follow these steps **in the respictive order** after cloning the repository.
+
+### 1. Install the Script and Dependencies
+```bash
 cd ukwinika-backups
 sudo make install
+```
+This installs `borgbackup` and `inotify-tools` if needed, copies the script to `/usr/local/bin/`, and creates the Prometheus metrics directory.
+
+### 2. Copy and Edit Configuration Files
+```bash
+# Secrets file (must be 600!)
+sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
+
+sudo chmod 600 /etc/ukwinika-backup.secrets
+
+sudo nano /etc/ukwinika-backup.secrets
+```
+Replace the placeholder passphrase and, optionally, the Slack webhook URL and email address.
+
+```bash
+# Main configuration
+sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
+
+sudo chmod 600 /etc/ukwinika-backup.conf
+
+sudo nano /etc/ukwinika-backup.conf
+```
+Adjust paths, retention, USB mount point, database type, and hook locations as needed.
+
+### 3. Initialise the Borg Repository
+```bash
+sudo enhanced_automated_backups.sh init
+```
+You’ll be prompted for the passphrase – use the one you placed in the secrets file.  
+The repository is created at `/UKwinikaBackup/borg-repo` (configurable in `ukwinika-backup.conf`).
+
+### 4. Deploy Systemd Services and Logrotate
+```bash
 sudo make systemd
+```
+This installs the daily timer, the main backup service, the real‑time monitoring service, and the logrotate configuration.
 
-# Then edit config and secrets, initialise Borg repo, and test.
+### 5. Test a Backup
+```bash
+sudo enhanced_automated_backups.sh backup
+```
+Check the logs:
+```bash
+sudo tail -f /var/log/UKwinikaBackup.log
 ```
 
-After installation, follow the following steps
-
-## Setup (Debian or RHEL)
-
-1. **Create Secure Passphrase File**  
-   ```bash
-   # Remember to set Your Pass Phrase here
-   sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
-   sudo chmod 600 /etc/ukwinika-backup.secrets
-   
-   sudo nano /etc/ukwinika-backup.secrets
-   ```
-
-2. **Initialize Borg Repository**  
-   ```bash
-   sudo borg init --encryption=repokey /UKwinikaBackup/borg-repo
-   ```
-
-3. **Configure the Script**  
-   ```bash
-   sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
-   sudo chmod 600 /etc/ukwinika-backup.secrets
-   sudo nano /etc/ukwinika-backup.secrets
-   
-   sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
-   sudo chmod 600 /etc/ukwinika-backup.conf
-   sudo nano /etc/ukwinika-backup.conf
-   ```
-
-4. **Deploy Systemd Services and Logrotate**  
-   ```bash
-   sudo make systemd
-   ```
-
-5. **Test the Backup**  
-   ```bash
-   sudo enhanced_automated_backups.sh backup incremental borg
-   ```
-
-6. **Enable Daily Automation**  
-   ```bash
-   sudo systemctl enable --now ukwinika-backup.timer
-   ```
-   
-7. **Enable Real-Time monitoring**
-   ```bash
-    sudo systemctl start ukwinika-realtime-backup.service
-   ```
-   
-## RHEL-Specific Notes
-
-- The Makefile automatically enables the EPEL repository and installs borgbackup via dnf.
-- Ensure your system is registered with Red Hat Subscription Manager (or using Rocky/AlmaLinux) for full package access.
-
-## Ansible Integration 
-
-UKwinika EABS includes native Ansible support for large-scale, idempotent deployments.
-
-### Using Ansible
-1. Place the provided Ansible role (coming in future releases) or create your own.
-2. Example playbook snippet:
-   ```yaml
-   - name: Deploy UKwinika Backup
-     hosts: backup_servers
-     roles:
-       - ukwinika-backup
-   ```
-Key Ansible features:
-- Idempotent installation via `make install`
-- Automatic configuration of `/etc/ukwinika-backup.conf`
-- Deployment of systemd services and timers
-- Optional inventory-based passphrase and config management
-- Role variables for customizing DB_TYPE, retention, real-time directories, etc.
-
-See the `ansible/` directory or use the current Makefile for manual Ansible integration.
-
-The script automatically follows the 3-2-1 backup rule:
-- After the primary Borg backup completes on the system disk, it will:
-   - Copy the new archive to removable USB if present
-   - Upload the new archive to the cloud if `CLOUD_REMOTE` is set in the config
-     
-## Where Backups Are Stored (3-2-1 Principle)
-- Primary copy (always): `/UKwinikaBackup/borg-repo` (system disk)
-- Secondary copy (if USB detected): `/media/usb` or configured `REMOVABLE_MOUNT`
-- Tertiary copy (if configured): Cloud storage via `rclone`
-  
-Archive names follow the pattern: `system_backup_incremental_YYYYMMDD_HHMMSS` or `system_backup_full_YYYYMMDD_HHMMSS`.
-
-**Manual Borg commands:**
+### 6. Enable Daily Scheduled Backups
 ```bash
+sudo systemctl enable --now ukwinika-backup.timer
+```
+
+### 7. (Optional) Start Real‑time Monitoring
+```bash
+sudo systemctl start ukwinika-realtime-backup.service
+```
+The service monitors directories defined in `REAL_TIME_DIRS` (default: `/etc` and `/home`) and triggers a backup whenever a file changes.
+
+---
+
+## Usage
+
+| Command | Description |
+|--------|-------------|
+| `sudo enhanced_automated_backups.sh backup` | Full backup cycle |
+| `sudo enhanced_automated_backups.sh restore <archive> [target]` | Restore an archive to a target directory |
+| `sudo enhanced_automated_backups.sh list` | List all archives |
+| `sudo enhanced_automated_backups.sh check` | Verify repository integrity |
+| `sudo enhanced_automated_backups.sh init` | Initialise a new Borg repository |
+| `sudo enhanced_automated_backups.sh real-time` | Start real‑time monitoring manually |
+
+**Examples:**
+```bash
+# Run a backup
+sudo enhanced_automated_backups.sh backup
+
+# Safe restore (files go to /tmp/restore_<archive> by default)
+sudo enhanced_automated_backups.sh restore debian-2026-04-25_08:20:17 /mnt/restore-test
+
+# List available archives
+sudo enhanced_automated_backups.sh list
+```
+
+---
+
+## Where Backups Are Stored (3‑2‑1)
+
+- **Primary copy:** `/UKwinikaBackup/borg-repo` (system disk)
+- **Secondary copy:** Removable USB (mounted at the path defined in `USB_MOUNT`)
+- **Tertiary copy:** Cloud storage via `rclone` if `CLOUD_REMOTE` is configured
+
+Archive names follow the pattern: `<hostname>-<YYYY-MM-DD_HH:MM:SS>`
+
+---
+
+## How to Restore a File or Folder
+
+### Using the Script (Recommended)
+```bash
+sudo enhanced_automated_backups.sh restore <archive_name> /desired/target
+```
+This safely extracts the archive to the given target without overwriting live data.  
+**Drill mode:** run the restore to a temporary directory like `/tmp/restore_drill` to verify contents.
+
+### Manual Borg Commands
+```bash
+# List archives
 sudo borg list /UKwinikaBackup/borg-repo
-sudo borg extract --strip-components 1 /UKwinikaBackup/borg-repo::ARCHIVE_NAME path/to/file-or-folder
-```
 
-**Browse mode:**
-```bash
+# Extract a specific file/folder
+sudo borg extract --strip-components 1 /UKwinikaBackup/borg-repo::<archive> path/to/file
+
+# Browse an archive as a filesystem
 sudo mkdir -p /mnt/borg-restore
+
 sudo borg mount /UKwinikaBackup/borg-repo /mnt/borg-restore
+
 ls /mnt/borg-restore
+
 sudo borg umount /mnt/borg-restore
 ```
-Always test Restores regularly using the commands above.
 
-## Usage Examples
-- Incremental backup: `sudo enhanced_automated_backups.sh backup incremental borg`
-- Full backup: `sudo enhanced_automated_backups.sh backup full borg`
-- View logs: `sudo tail -f /var/log/UKwinikaBackup.log`
+> **Remember:** A backup is only as good as its last successful restore. Test regularly.
 
-## MySQL / Database Fix (Debian)
+---
+
+## Database Support
+
+Set `DB_TYPE` in the configuration file to `mysql`, `postgresql`, or `mongodb`.  
+For MySQL on Debian/Ubuntu, you may need to create a credentials file:
+
 ```bash
 sudo bash -c 'cat > /root/.my.cnf <<EOF
 [client]
@@ -171,17 +215,39 @@ password=your_mysql_root_password
 EOF'
 sudo chmod 600 /root/.my.cnf
 ```
+
+---
+
 ## Troubleshooting
-- **Borg lock timeout** 
-- **Real-time monitoring not working** → Ensure `inotify-tools` is installed
-- **MySQL access denied** → Use the `.my.cnf` fix above
-- **Passphrase prompt** → Verify `/etc/ukwinika-backup.secrets`
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| `Borg create failed` | Repository not initialised | Run `sudo enhanced_automated_backups.sh init` |
+| Real‑time monitoring not working | `inotify-tools` missing | `sudo make install` (installs it automatically) |
+| MySQL access denied | Missing or incorrect `.my.cnf` | Create `/root/.my.cnf` with valid credentials |
+| Passphrase prompt during backup | Secrets file missing or incorrect permissions | Ensure `/etc/ukwinika-backup.secrets` exists, is mode `0600`, and contains `BORG_PASSPHRASE` |
+
+---
 
 ## Security & Best Practices
-- Passphrase stored securely in `/etc/ukwinika-backup.secrets` (600 permissions)
-- Borg uses `repokey` encryption (AES-256)
-- Concurrency locking prevents overlapping backups
-- Recommended: Replicate the repository to S3 with Object Lock for immutability
-- Run monthly restore drills
+
+- The passphrase and any webhook/email credentials live exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`).
+- Borg uses `repokey` encryption – **never lose your passphrase or repository key**.
+- The script uses file locking (`flock`) to prevent concurrent executions.
+- Rotate logs with the provided logrotate configuration.
+- Run monthly restore drills using the checklist in `docs/RESTORE-CHECKLIST.md`.
+
+---
+
+## RHEL‑Specific Notes
+
+- The `Makefile` enables the EPEL repository and installs `borgbackup` via `dnf`.
+- Make sure your system is subscribed (RHEL) or that you are using a compatible derivative (Rocky, AlmaLinux, CentOS).
+
+---
 
 **UKwinika Notable Advice: A Backup is Only as Good as its Last Successful Restore.**
+
+## License
+
+This project is licensed under the MIT License – see the `LICENSE` file for details.
