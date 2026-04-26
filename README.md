@@ -65,15 +65,14 @@ After installation, follow the **Setup** section below.
    # Remember to set Your Pass Phrase here
    sudo bash -c 'echo "YourStrongPassphraseHere123!" > /etc/ukwinika-backup.secrets'
    sudo chmod 600 /etc/ukwinika-backup.secrets
+   
    sudo nano /etc/ukwinika-backup.secrets
    ```
 
 2. **Initialize Borg Repository**  
    ```bash
-   # Option A: Use the Script’s `init` command
-   sudo enhanced_automated_backups.sh init
-
-   # Option B: Manual – just as effective
+   sudo mkdir -p /UKwinikaBackup
+   
    sudo borg init --encryption=repokey /UKwinikaBackup/borg-repo
    ```
 
