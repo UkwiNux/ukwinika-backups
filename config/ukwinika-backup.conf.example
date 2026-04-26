@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Configuration Example – v3.0 (idempotent edition)
+# UKwinika Backup Configuration Example (idempotent edition)
 # Copy to /etc/ukwinika-backup.conf and adjust STRICTLY no secrets here.
 # =============================================================================
 
