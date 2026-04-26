@@ -48,6 +48,7 @@ ukwinika-backups/
 │   └── post_backup_hook.sh.example
 └── .github/
     └── workflows/
+        ├── release.yml
         └── test.yml
 ```
 
