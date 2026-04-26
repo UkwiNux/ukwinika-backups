@@ -1,22 +1,20 @@
 # UKwinika Enhanced Automated Backup Script [EABS]
 
-**A Linux Backup Solution** with Borg (recommended), Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media, Ansible Support & Cloud Backup Support.
-
-**A Smart, Idempotent 3‑2‑1 Backup Solution for Linux**
+**A 3‑2‑1 Backup Strategy Solution** with Borg, Real-time Monitoring, Database Consistency, Encryption, Auditing, Restore Drills, Removable Media & Cloud Backup Support.
 
 **Author:** Urayayi Kwinika  
 **License:** MIT
 
 ## Features 
-- **Fully idempotent**: safe to run multiple times without side effects.
-- Backup modes: `backup`, `real-time` (inotify), `restore` (with safe drill mode)
+- **Fully Idempotent**: safe to run multiple times without side effects.
+- Backup Modes: `backup`, `real-time` (inotify), `restore` (with Safe Drill Mode)
 - Default tool: **Borg** (deduplication, native AES-256, checkpoints, mountable archives)
 - 3-2-1 Backup Principle: Primary on System, Secondary on Removable USB, Tertiary on Cloud
-- Pre/post backup hooks
-- Removable USB auto-detection
-- **Stale Lock Prevention** – lock file is automatically removed on exit.
-- Detailed audit trail with SHA256 checksums
-- Systemd timers + logrotate ready
+- Pre/Post Backup Hooks
+- Removable USB Auto-Detection
+- **Stale Lock Prevention** – Lock File is automatically removed on exit.
+- Detailed Audit Trail with SHA256 checksums
+- Systemd Timers + Logrotate ready
 - Full Support for Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS
 
 ## Repository Structure
@@ -45,7 +43,7 @@ ukwinika-backups/
 │       └── test.yml
 ```
 
-## Quick Start – Clone from GitHub (Recommended for Latest Version)
+## Quick Start – Clone from GitHub 
 
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
@@ -56,7 +54,7 @@ sudo make systemd
 # Then edit config and secrets, initialise Borg repo, and test.
 ```
 
-After installation, follow the **Setup** section below.
+After installation, follow the following steps
 
 ## Setup (Debian or RHEL)
 
@@ -114,7 +112,7 @@ After installation, follow the **Setup** section below.
 
 ## Ansible Integration 
 
-UKwinika EABS now includes native Ansible support for large-scale, idempotent deployments.
+UKwinika EABS includes native Ansible support for large-scale, idempotent deployments.
 
 ### Using Ansible
 1. Place the provided Ansible role (coming in future releases) or create your own.
