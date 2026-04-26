@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Pre-Backup Hook – v3.0
+# UKwinika Pre-Backup Hook
 # Place in /etc/ukwinika/pre_backup_hook.sh and make executable (chmod +x)
 # This script is sourced by the main backup – use $? to check previous steps.
 # =============================================================================
