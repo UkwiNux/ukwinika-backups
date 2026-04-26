@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # UKwinika Enhanced Automated Backup Script – Smart Idempotent Edition
-# Version: 3.1
-# Author: Urayayi Kwinika (refined per security & idempotency audit)
+# Author: Urayayi Kwinika 
 # Description:
 #   - Fully idempotent 3‑2‑1 backup (Borg → USB → Cloud)
 #   - Safe restore with dedicated target directory
@@ -43,7 +42,7 @@ fi
 BORG_PASSPHRASE="${BORG_PASSPHRASE:?}"
 export BORG_PASSPHRASE
 
-BORG_REPO="${BORG_REPO:-/var/UKwinikaBackup/borg_repo}"
+BORG_REPO="${BORG_REPO:-/var/backups/borg-repo}"
 BACKUP_PATHS=("${BACKUP_PATHS[@]:-/}")
 EXCLUDE_DIRS=("${EXCLUDE_DIRS[@]:-/proc /sys /dev /tmp /run /mnt /media /lost+found}")
 
