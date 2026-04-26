@@ -69,8 +69,6 @@ After installation, follow the following steps
 
 2. **Initialize Borg Repository**  
    ```bash
-   sudo mkdir -p /UKwinikaBackup
-   
    sudo borg init --encryption=repokey /UKwinikaBackup/borg-repo
    ```
 
