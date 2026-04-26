@@ -1,4 +1,4 @@
-# UKwinika Enhanced Automated Backup Script – Documentation
+# UKwinika Enhanced Automated Backup Script
 
 **Version:** 3.1 (Idempotent Edition)  
 **Author:** Urayayi Kwinika  
