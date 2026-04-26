@@ -4,7 +4,7 @@
 # =============================================================================
 
 # ---------- Borg repository path (primary copy) -----------------------------
-BORG_REPO="/var/backups/borg-repo"
+BORG_REPO="/UKwinikaBackup/borg-repo"
 
 # ---------- Paths to back up (array) ----------------------------------------
 # Default: entire root filesystem (excluding patterns below)
