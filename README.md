@@ -72,16 +72,11 @@ Then follow the **Setup** steps below to configure and initialise the repository
 
 ## Full Setup (Debian / RHEL)
 
-Follow these steps **in the respictive order** after cloning the repository.
+Follow these steps **in the respective order** after cloning the repository.
 
-### 1. Install the Script and Dependencies
-```bash
-cd ukwinika-backups
-sudo make install
-```
 This installs `borgbackup` and `inotify-tools` if needed, copies the script to `/usr/local/bin/`, and creates the Prometheus metrics directory.
 
-### 2. Copy and Edit Configuration Files
+### 1. Copy and Edit Configuration Files
 ```bash
 # Secrets file (must be 600!)
 sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
@@ -102,20 +97,20 @@ sudo nano /etc/ukwinika-backup.conf
 ```
 Adjust paths, retention, USB mount point, database type, and hook locations as needed.
 
-### 3. Initialise the Borg Repository
+### 2. Initialise the Borg Repository
 ```bash
 sudo enhanced_automated_backups.sh init
 ```
 You’ll be prompted for the passphrase – use the one you placed in the secrets file.  
 The repository is created at `/UKwinikaBackup/borg-repo` (configurable in `ukwinika-backup.conf`).
 
-### 4. Deploy Systemd Services and Logrotate
+### 3. Deploy Systemd Services and Logrotate
 ```bash
 sudo make systemd
 ```
 This installs the daily timer, the main backup service, the real‑time monitoring service, and the logrotate configuration.
 
-### 5. Test a Backup
+### 4. Test a Backup
 ```bash
 sudo enhanced_automated_backups.sh backup
 ```
@@ -124,12 +119,12 @@ Check the logs:
 sudo tail -f /var/log/UKwinikaBackup.log
 ```
 
-### 6. Enable Daily Scheduled Backups
+### 5. Enable Daily Scheduled Backups
 ```bash
 sudo systemctl enable --now ukwinika-backup.timer
 ```
 
-### 7. (Optional) Start Real‑time Monitoring
+### 6. (Optional) Start Real‑time Monitoring
 ```bash
 sudo systemctl start ukwinika-realtime-backup.service
 ```
