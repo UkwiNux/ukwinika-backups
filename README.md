@@ -66,15 +66,11 @@ sudo make install        # Installs script and dependencies
 sudo make systemd        # Deploys systemd units and logrotate
 ```
 
-Then follow the **Setup** steps below to configure and initialise the repository.
+Then follow the **Setup** steps below in the respective order to configure and initialise the repository.
 
 ---
 
 ## Full Setup (Debian / RHEL)
-
-Follow these steps **in the respective order** after cloning the repository.
-
-This installs `borgbackup` and `inotify-tools` if needed, copies the script to `/usr/local/bin/`, and creates the Prometheus metrics directory.
 
 ### 1. Copy and Edit Configuration Files
 ```bash
@@ -85,7 +81,7 @@ sudo chmod 600 /etc/ukwinika-backup.secrets
 
 sudo nano /etc/ukwinika-backup.secrets
 ```
-Replace the placeholder passphrase and, optionally, the Slack webhook URL and email address.
+Replace the placeholder Passphrase and, optionally, the Slack webhook URL and email address.
 
 ```bash
 # Main configuration
