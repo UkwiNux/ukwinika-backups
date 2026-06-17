@@ -6,7 +6,9 @@ on:
 
 jobs:
   build-tarball:
-    runs-on: ubuntu-latest, debian-latest, redhat-latest
+    # Build once on ubuntu-latest; the tarball is distribution-agnostic bash.
+    # If per-distro smoke tests are needed, add a separate matrix job below.
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
@@ -16,7 +18,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Create clean ukwinika-backups-vX.Y.tar.gz (3-2-1 ready distribution)
+      - name: Create release tarball
         run: |
           TAG="${{ github.event.release.tag_name }}"
           tar -czf "ukwinika-backups-${TAG}.tar.gz" \
