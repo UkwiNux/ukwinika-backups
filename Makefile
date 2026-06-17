@@ -1,46 +1,70 @@
 # =============================================================================
-# UKwinika Backup Project Makefile – (idempotent edition)
+# UKwinika Backup Project Makefile – v3.2 (Idempotent Edition)
 # Author: Urayayi Kwinika
-# Description: Handles Installation, Dependencies, and Systemd Deployment
-# Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS Systems
+# Description: Handles installation, dependencies, and systemd deployment.
+# Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS systems.
 # =============================================================================
 
 .PHONY: install uninstall systemd clean deps
 
-INSTALL_DIR=/usr/local/bin
-SCRIPT=enhanced_automated_backups.sh
-SYSTEMD_DIR=/etc/systemd/system
-LOGROTATE_DIR=/etc/logrotate.d
-PROMETHEUS_DIR=/var/lib/prometheus/node_exporter/custom
+INSTALL_DIR  = /usr/local/bin
+SCRIPT       = enhanced_automated_backups.sh
+SYSTEMD_DIR  = /etc/systemd/system
+LOGROTATE_DIR = /etc/logrotate.d
 
+# ---------------------------------------------------------------------------
+# deps – install all runtime dependencies
+# ---------------------------------------------------------------------------
 deps:
 	@if [ -f /etc/debian_version ] || [ -f /etc/lsb-release ]; then \
-		echo "🔧 Detected Debian/Ubuntu System..."; \
-		sudo apt update && sudo apt install -y borgbackup inotify-tools; \
-	elif [ -f /etc/redhat-release ] || [ -f /etc/os-release ] && grep -qE 'rhel|rocky|alma|centos' /etc/os-release; then \
-		echo "🔧 Detected RHEL-based System (RHEL/Rocky/AlmaLinux/CentOS)..."; \
+		echo "🔧 Detected Debian/Ubuntu system..."; \
+		sudo apt-get update && sudo apt-get install -y \
+			borgbackup \
+			inotify-tools \
+			rsync \
+			mailutils; \
+	elif [ -f /etc/redhat-release ] || \
+	     ([ -f /etc/os-release ] && grep -qE 'rhel|rocky|alma|centos' /etc/os-release); then \
+		echo "🔧 Detected RHEL-based system (RHEL/Rocky/AlmaLinux/CentOS)..."; \
 		sudo dnf install -y epel-release || true; \
-		sudo dnf install -y borgbackup inotify-tools; \
+		sudo dnf install -y \
+			borgbackup \
+			inotify-tools \
+			rsync \
+			mailx; \
 	else \
-		echo "ℹ️ Unknown Distribution — please install Borgbackup and inotify-tools manually."; \
+		echo "ℹ️  Unknown distribution — please install borgbackup, inotify-tools, rsync, and a mail client manually."; \
 	fi
 
+# ---------------------------------------------------------------------------
+# install – copy script and set permissions (depends on deps)
+# ---------------------------------------------------------------------------
 install: deps
 	@sudo install -m 700 $(SCRIPT) $(INSTALL_DIR)/
-	@sudo mkdir -p $(PROMETHEUS_DIR)
-	@echo "✅ Script Installed to $(INSTALL_DIR)/$(SCRIPT)"
-	@echo "✅ Smart Idempotent Edition with full 3‑2‑1 Backup Stragety Implementation, Safe Restore, and Lock Cleanup."
+	@echo "✅ Script installed to $(INSTALL_DIR)/$(SCRIPT)"
+	@echo "✅ Smart idempotent edition with full 3-2-1 backup strategy, safe restore, and lock cleanup."
 
-uninstall: 
+# ---------------------------------------------------------------------------
+# uninstall – remove the installed script
+# ---------------------------------------------------------------------------
+uninstall:
 	@sudo rm -f $(INSTALL_DIR)/$(SCRIPT)
-	@echo "✅ Script Removed"
+	@echo "✅ Script removed from $(INSTALL_DIR)"
 
-systemd: 
+# ---------------------------------------------------------------------------
+# systemd – deploy service units and logrotate configuration
+# ---------------------------------------------------------------------------
+systemd:
 	@sudo cp systemd/* $(SYSTEMD_DIR)/
 	@sudo cp logrotate/ukwinika-backup $(LOGROTATE_DIR)/
 	@sudo systemctl daemon-reload
-	@echo "✅ Systemd Services and Logrotate Installed"
+	@echo "✅ Systemd services and logrotate installed"
+	@echo "   Enable the daily timer with:  sudo systemctl enable --now ukwinika-backup.timer"
+	@echo "   Enable real-time monitoring:  sudo systemctl enable --now ukwinika-realtime-backup.service"
 
-clean: 
+# ---------------------------------------------------------------------------
+# clean – remove runtime logs
+# ---------------------------------------------------------------------------
+clean:
 	@sudo rm -f /var/log/UKwinikaBackup*.log
-	@echo "✅ Logs Cleaned"
+	@echo "✅ Logs cleaned"
