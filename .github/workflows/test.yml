@@ -14,18 +14,73 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y borgbackup rsync inotify-tools mailutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y borgbackup rsync inotify-tools mailutils
+
       - name: Make script executable
         run: chmod +x enhanced_automated_backups.sh
-      - name: Syntax check
+
+      - name: Bash syntax check
         run: bash -n enhanced_automated_backups.sh
-      - name: Test mode validation (dry run)
+
+      - name: Basic invocation test (list against temp repo)
         run: |
-          # Simulate a minimal config for syntax check
-          export BORG_PASSPHRASE=test
-          export BORG_REPO=$(mktemp -d)
-          bash enhanced_automated_backups.sh list 2>/dev/null || true
-          echo "✅ Basic Validation Passed"
-      - name: Check example config exists
-        run: test -f config/ukwinika-backup.conf.example
+          # Create a minimal secrets + config so the script can load cleanly.
+          REPO=$(mktemp -d)
+          SECRETS=$(mktemp)
+          CONFIG=$(mktemp)
+
+          echo "BORG_PASSPHRASE=ci-test-passphrase" > "$SECRETS"
+          cat > "$CONFIG" << EOF
+          BORG_REPO="${REPO}/borg-repo"
+          BACKUP_PATHS=("/tmp")
+          EXCLUDE_DIRS=()
+          RETENTION_DAYS=7
+          RETENTION_VERSIONS=1
+          USB_RSYNC_TARGET=""
+          CLOUD_REMOTE=""
+          DB_TYPE="none"
+          DB_DUMP_DIR="${REPO}/db-dump"
+          CHECKSUM_FILE="${REPO}/checksums.txt"
+          PRE_HOOK=""
+          POST_HOOK=""
+          HOOK_FAIL_ACTION="warn"
+          REAL_TIME_DIRS=("/tmp")
+          EMAIL_TO=""
+          METRICS_ENABLED="no"
+          PROMETHEUS_FILE="${REPO}/ukwinika_backup.prom"
+          EOF
+
+          export UKW_CONFIG="$CONFIG"
+          export UKW_SECRETS="$SECRETS"
+          export BORG_PASSPHRASE="ci-test-passphrase"
+
+          # Initialise repo and verify list works
+          borg init --encryption=repokey "${REPO}/borg-repo"
+          bash enhanced_automated_backups.sh list
+          echo "✅ Basic validation passed"
+
+          # Clean up
+          rm -rf "$REPO" "$SECRETS" "$CONFIG"
+
+      - name: Check example config and secrets files exist
+        run: |
+          test -f config/ukwinika-backup.conf.example
+          test -f config/ukwinika-backup.secrets.example
+          echo "✅ Config examples present"
+
+      - name: Verify all documented variables are present in the conf example
+        run: |
+          for var in BORG_REPO BACKUP_PATHS EXCLUDE_DIRS RETENTION_DAYS \
+                     RETENTION_VERSIONS USB_MOUNT USB_RSYNC_TARGET CLOUD_REMOTE \
+                     DB_TYPE DB_DUMP_DIR PRE_HOOK POST_HOOK HOOK_FAIL_ACTION \
+                     REAL_TIME_DIRS EMAIL_TO METRICS_ENABLED PROMETHEUS_FILE \
+                     CHECKSUM_FILE; do
+            grep -q "^${var}=" config/ukwinika-backup.conf.example \
+              || grep -q "^# ${var}" config/ukwinika-backup.conf.example \
+              || (echo "MISSING in conf.example: ${var}" && exit 1)
+          done
+          echo "✅ All variables accounted for in conf.example"
