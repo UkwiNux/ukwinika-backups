@@ -5,7 +5,7 @@
 # Version: 3.2
 # Description:
 #   - Fully idempotent 3‑2‑1 backup (Borg → USB → Cloud)
-#   - Safe restore with dedicated target directory
+#   - Safe Restore with dedicated target directory
 #   - Stale‑lock prevention via cleanup trap
 #   - Secrets separated from configuration
 #   - Strict DB type validation
@@ -82,7 +82,7 @@ DB_DUMP_DIR="${DB_DUMP_DIR:-/tmp/ukwinika-db-dump}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-/tmp/ukwinika-backup-checksums.txt}"
 
 # =============================================================================
-# Logging helpers
+# Logging Helpers
 # =============================================================================
 log()   { echo "$(date '+%F %T') $SCRIPT_NAME: $*" | tee -a "$LOG_FILE"; }
 audit() {
@@ -106,7 +106,7 @@ cleanup_lock() {
 trap cleanup_lock EXIT INT TERM
 
 # =============================================================================
-# Hook runner
+# Hook Runner
 # =============================================================================
 run_hook() {
     local hook="$1"
@@ -164,7 +164,7 @@ db_dump() {
 }
 
 # =============================================================================
-# Borg archive creation + pruning
+# Borg Archive Creation + Pruning
 # =============================================================================
 borg_backup() {
     local dump_path="$1"
@@ -210,7 +210,7 @@ borg_backup() {
 }
 
 # =============================================================================
-# USB secondary copy
+# USB Secondary Copy
 # =============================================================================
 sync_to_usb() {
     if [[ -z "$USB_RSYNC_TARGET" ]]; then
@@ -234,7 +234,7 @@ sync_to_usb() {
 }
 
 # =============================================================================
-# Cloud tertiary copy
+# Cloud Tertiary Copy
 # =============================================================================
 cloud_upload() {
     if [[ -z "$CLOUD_REMOTE" ]]; then
@@ -253,7 +253,7 @@ cloud_upload() {
 }
 
 # =============================================================================
-# Audit – SHA256 checksums of all repository objects
+# Audit – SHA256 Checksums of All Repository Objects
 # =============================================================================
 audit_checksum() {
     log "Generating SHA256 checksums of repository..."
@@ -262,7 +262,7 @@ audit_checksum() {
 }
 
 # =============================================================================
-# Prometheus metrics
+# Prometheus Metrics
 # =============================================================================
 push_metrics() {
     [[ "$METRICS_ENABLED" != "yes" ]] && return 0
@@ -303,7 +303,7 @@ notify() {
 }
 
 # =============================================================================
-# Real-time monitoring
+# Real-Time Monitoring
 # Spawns backup as a child process so it does not attempt to re-acquire the
 # parent's flock file descriptor.
 # =============================================================================
@@ -338,7 +338,7 @@ restore_backup() {
 }
 
 # =============================================================================
-# Convenience wrappers
+# Convenience Wrappers
 # =============================================================================
 list_archives() {
     borg list "$BORG_REPO" || die "Cannot list archives"
@@ -364,7 +364,7 @@ ensure_repo_exists() {
 }
 
 # =============================================================================
-# Full backup cycle
+# Full Backup Cycle
 # =============================================================================
 run_backup() {
     log "=== Starting UKwinika Enhanced Backup ==="
@@ -382,7 +382,7 @@ run_backup() {
 }
 
 # =============================================================================
-# CLI dispatch
+# CLI Dispatch
 # =============================================================================
 case "${1:-}" in
     backup)
