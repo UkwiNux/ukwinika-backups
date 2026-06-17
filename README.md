@@ -1,8 +1,8 @@
 # UKwinika Enhanced Automated Backup Script (EABS)
 
-**A 3‑2‑1 Backup Solution** built on BorgBackup with real-time monitoring, database dumps, AES-256 encryption, audit trails, Prometheus metrics, and cloud support.
+**A 3‑2‑1 Backup Solution** built on BorgBackup with **Real-Time Monitoring**, **Database Dumps**, **AES-256 Encryption**, **Audit Trails**, **Prometheus Metrics**, and **Cloud Support**.
 
-**Author:** Urayayi Kwinika | **Version:** 3.2 | **License:** MIT
+**Author:** **Urayayi Kwinika** | Version: 3.2 | **License:** MIT
 
 ---
 
