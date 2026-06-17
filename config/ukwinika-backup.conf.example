@@ -1,48 +1,77 @@
 # =============================================================================
-# UKwinika Backup Configuration Example (idempotent edition)
-# Copy to /etc/ukwinika-backup.conf and adjust STRICTLY no secrets here.
+# UKwinika Backup Configuration Example – v3.2 Idempotent Edition
+# Copy to /etc/ukwinika-backup.conf and adjust.
+# STRICTLY no secrets in this file — all credentials go in ukwinika-backup.secrets.
+# Permissions: sudo chmod 600 /etc/ukwinika-backup.conf
 # =============================================================================
 
 # ---------- Borg Repository Path (Primary Copy) -----------------------------
 BORG_REPO="/UKwinikaBackup/borg-repo"
 
-# ---------- Paths to Back Up (Array) ----------------------------------------
-# Default: entire root filesystem (excluding patterns below)
+# ---------- Paths to Back Up (Bash array) -----------------------------------
+# Default: entire root filesystem, minus the exclusions below.
 BACKUP_PATHS=("/")
 
-# ---------- Exclude Patterns (Array) ----------------------------------------
-# These become `--exclude` arguments for Borg; no other location defines them.
+# ---------- Exclude Patterns (Bash array) -----------------------------------
+# Each entry becomes an --exclude argument for borg create.
+# This is the single source of truth — do not add exclusions anywhere else.
 EXCLUDE_DIRS=(
-    "/proc" "/sys" "/dev" "/tmp" "/run" "/mnt" "/media" "/lost+found"
-    "/var/cache" "/var/tmp" "/home/*/.cache"
+    "/proc"
+    "/sys"
+    "/dev"
+    "/tmp"
+    "/run"
+    "/mnt"
+    "/media"
+    "/lost+found"
+    "/var/cache"
+    "/var/tmp"
+    "/home/*/.cache"
 )
 
-# ---------- Retention -------------------------------------------------------
-RETENTION_DAYS=90             # keep all archives within this many days
-RETENTION_VERSIONS=5          # minimum number of versions to keep
+# ---------- Retention Policy ------------------------------------------------
+RETENTION_DAYS=90        # keep all archives created within this many days
+RETENTION_VERSIONS=5     # minimum number of recent archives to keep regardless of age
 
-# ---------- USB Off‑Site copy (Secondary) -----------------------------------
-USB_MOUNT="/mnt/backup_usb"               # mount point
-USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"   # destination folder on USB
+# ---------- USB Secondary Copy ----------------------------------------------
+USB_MOUNT="/mnt/backup_usb"
+USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"
+# Leave USB_RSYNC_TARGET empty to skip the secondary USB copy.
 
-# ---------- Cloud Upload (Tertiary) -----------------------------------------
-# rclone remote name and path, e.g. "s3:my-borg-backups"
+# ---------- Cloud Tertiary Copy (rclone) ------------------------------------
+# Set to a configured rclone remote + path, e.g. "s3:my-borg-backups"
+# Leave empty to skip the cloud upload.
 CLOUD_REMOTE=""
 
 # ---------- Database Dump ---------------------------------------------------
-DB_TYPE="none"                 # none, mysql, postgresql, mongodb
+# Supported values: none, mysql, postgresql, mongodb
+# Any other value aborts the backup immediately for data safety.
+DB_TYPE="none"
+
+# Directory where database dumps are written before being included in the archive.
+# Wiped and recreated on every run (idempotent).
+DB_DUMP_DIR="/tmp/ukwinika-db-dump"
 
 # ---------- Hooks -----------------------------------------------------------
 PRE_HOOK="/etc/ukwinika/pre_backup_hook.sh"
 POST_HOOK="/etc/ukwinika/post_backup_hook.sh"
-HOOK_FAIL_ACTION="fatal"      # fatal (stop) or warn (continue)
+# fatal  → abort the backup if the hook exits non-zero
+# warn   → log a warning and continue
+HOOK_FAIL_ACTION="fatal"
 
-# ---------- Real‑Time Monitoring Directories --------------------------------
+# ---------- Real-Time Monitoring Directories --------------------------------
+# Bash array of directories watched by inotifywait in real-time mode.
 REAL_TIME_DIRS=("/etc" "/home")
 
-# ---------- Notification Recipients (Non‑Secret) ---------------------------
+# ---------- Notifications (Non-Secret Recipients) ---------------------------
+# EMAIL_TO can also be placed in the secrets file if the address is sensitive.
 EMAIL_TO="admin@example.com"
 
 # ---------- Prometheus Metrics ----------------------------------------------
 METRICS_ENABLED="yes"
 PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
+# The parent directory of PROMETHEUS_FILE is created automatically if missing.
+
+# ---------- Audit Checksum File ---------------------------------------------
+# Path where SHA256 checksums of all repository objects are written after backup.
+CHECKSUM_FILE="/tmp/ukwinika-backup-checksums.txt"
