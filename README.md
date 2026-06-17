@@ -8,19 +8,19 @@
 
 ## Features
 
-- **Fully idempotent** – safe to run any number of times; no stale locks, no duplicate side effects.
-- **3‑2‑1 Backup** – primary on disk (Borg), secondary on removable USB (rsync mirror), tertiary to cloud (rclone).
+- **Fully Idempotent** – safe to run any number of times; no stale locks, no duplicate side effects.
+- **3‑2‑1 Backup** – primary on disk (Borg), secondary on removable USB (rsync mirror), tertiary to Cloud (rclone).
 - **BorgBackup** – deduplication, lz4 compression, AES‑256 `repokey` encryption, mountable archives.
-- **Safe restore & drill mode** – extracts archives to an isolated target directory; live data is never touched by default.
-- **Real‑time monitoring** – inotify triggers a full backup on file change, using a lock-safe child process.
-- **Database-aware** – pre-backup dumps for MySQL, PostgreSQL, and MongoDB; unknown `DB_TYPE` aborts immediately.
-- **Pre/post hooks** – custom scripts before and after each backup, with configurable failure behaviour.
-- **Failure notifications** – Slack and email alerts fire on both success and failure.
-- **Prometheus metrics** – exposes last-success timestamp and latest archive name for monitoring.
-- **SHA256 audit trail** – checksums of all repository objects logged after every backup.
-- **Stale lock prevention** – lock file is automatically removed on any exit (`EXIT`, `INT`, `TERM`).
-- **Systemd & logrotate** – timer, services, and log rotation included and ready to deploy.
-- **Cross-distribution** – Debian, Ubuntu, RHEL, Rocky Linux, AlmaLinux, CentOS.
+- **Safe Restore & Drill Mode** – extracts archives to an isolated target directory; live data is never touched by default.
+- **Real‑Time Monitoring** – inotify triggers a full backup on file change, using a lock-safe child process.
+- **Database-Aware** – pre-backup dumps for MySQL, PostgreSQL, and MongoDB; unknown `DB_TYPE` aborts immediately.
+- **Pre/Post Hooks** – custom scripts before and after each backup, with configurable failure behaviour.
+- **Failure Notifications** – Slack and email alerts fire on both success and failure.
+- **Prometheus Metrics** – exposes last-success timestamp and latest archive name for monitoring.
+- **SHA256 Audit Trail** – checksums of all repository objects logged after every backup.
+- **Stale Lock Prevention** – lock file is automatically removed on any exit (`EXIT`, `INT`, `TERM`).
+- **Systemd & Logrotate** – timer, services, and log rotation included and ready to deploy.
+- **Cross-Distribution** – Debian, Ubuntu, RHEL, Rocky Linux, AlmaLinux, CentOS.
 
 ---
 
@@ -96,7 +96,7 @@ sudo nano /etc/ukwinika-backup.conf
 
 Key settings to review: `BORG_REPO`, `BACKUP_PATHS`, `EXCLUDE_DIRS`, `USB_MOUNT`, `USB_RSYNC_TARGET`, `CLOUD_REMOTE`, `DB_TYPE`. See the [Configuration Reference](#configuration-reference) below.
 
-### 3. Initialise the Borg repository
+### 3. Initialise the Borg Repository
 
 ```bash
 sudo enhanced_automated_backups.sh init
@@ -104,7 +104,7 @@ sudo enhanced_automated_backups.sh init
 
 Creates the repository at the path set in `BORG_REPO` (default `/UKwinikaBackup/borg-repo`) using `repokey` encryption. Running this again on an existing valid repository does nothing.
 
-### 4. Test a backup
+### 4. Test a Backup
 
 ```bash
 sudo enhanced_automated_backups.sh backup
@@ -112,13 +112,13 @@ sudo enhanced_automated_backups.sh backup
 sudo tail -f /var/log/UKwinikaBackup.log
 ```
 
-### 5. Enable daily scheduled backups
+### 5. Enable Daily Scheduled Backups
 
 ```bash
 sudo systemctl enable --now ukwinika-backup.timer
 ```
 
-### 6. (Optional) Enable real-time monitoring
+### 6. (Optional) Enable Real-Time Monitoring
 
 ```bash
 sudo systemctl enable --now ukwinika-realtime-backup.service
@@ -215,7 +215,7 @@ Archive names follow the pattern: `<hostname>-<YYYY-MM-DD_HH:MM:SS>`
 
 ## How to Restore a File or Folder
 
-### Using the script (recommended)
+### Using the Script (recommended)
 
 ```bash
 # Restore an entire archive to a safe location
@@ -225,7 +225,7 @@ sudo enhanced_automated_backups.sh restore <archive_name> /desired/target
 sudo enhanced_automated_backups.sh restore <archive_name>
 ```
 
-### Manual Borg commands
+### Manual Borg Commands
 
 ```bash
 # List archives
@@ -242,7 +242,7 @@ ls /mnt/borg-restore
 sudo borg umount /mnt/borg-restore
 ```
 
-Run a **monthly restore drill** using the checklist in `docs/RESTORE-CHECKLIST.md`.
+Run a **Monthly Restore Drill** using the checklist in `docs/RESTORE-CHECKLIST.md`.
 
 ---
 
