@@ -59,9 +59,11 @@ git clone https://github.com/UkwiNux/ukwinika-backups.git
 
 cd ukwinika-backups
 
-sudo make install        # Installs script and dependencies (borgbackup, inotify-tools)
+# Installs script and dependencies (borgbackup, inotify-tools)
+sudo make install        
 
-sudo make systemd        # Deploys systemd units and logrotate
+# Deploys systemd units and logrotate
+sudo make systemd        
 ```
 
 Then follow the full setup below.
