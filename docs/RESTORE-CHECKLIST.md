@@ -1,27 +1,28 @@
 # UKwinika Backup – Monthly Restore Drill Checklist
 
-**Purpose:** Ensure that backups are complete, restorable, and that no silent corruption has occurred.  
+**Version:** v3.2
+**Purpose:** Confirm that backups are complete, restorable, and free of silent corruption.
 **Frequency:** At least once per month, and after any major system change (OS upgrade, storage migration, configuration overhaul).
 
-This checklist uses the idempotent restore features of UKwinika EABS v3.1 – you can repeat the drill without risk to live data.
+This checklist uses the idempotent restore features of UKwinika EABS v3.2 — you can repeat the drill without risk to live data.
 
 ---
 
-## 1. Pre‑flight Check
+## 1. Pre-flight Check
 
-- [ ] **Confirm the backup repository exists and is healthy:**
+- [ ] **Verify the repository exists and is structurally intact:**
   ```bash
   sudo enhanced_automated_backups.sh check
   ```
-  If the check fails, investigate and repair the repository before proceeding.
+  This runs a full `borg check` on the repository. If it fails, investigate and repair before proceeding.
 
 - [ ] **List all available archives:**
   ```bash
   sudo enhanced_automated_backups.sh list
   ```
-  Identify the most recent archive (or a specific one you want to test).
+  Identify the most recent archive (or a specific one you want to test). Archive names follow the pattern `<hostname>-<YYYY-MM-DD_HH:MM:SS>`.
 
-- [ ] **Ensure enough free space on the target filesystem** (default is `/tmp`).  
+- [ ] **Ensure enough free space on the target filesystem** (default restore target is `/tmp`).
   The restore directory will be `/tmp/restore_<archive_name>` unless you specify a custom path.
 
 - [ ] **Choose a custom target directory** (optional) if you prefer a dedicated location, e.g.:
@@ -33,22 +34,24 @@ This checklist uses the idempotent restore features of UKwinika EABS v3.1 – yo
 
 ## 2. Perform the Drill Restore
 
-Run the restore command **with a safe target** – by default, files are extracted to `/tmp/restore_<archive_name>` and will never overwrite live data.
+Run the restore command with a safe target — by default, files are extracted to `/tmp/restore_<archive_name>` and will never touch live data.
 
 ```bash
-# Using the default target (recommended for most tests)
+# Default target (recommended for most tests)
 sudo enhanced_automated_backups.sh restore <archive_name>
 
-# Or with a custom target
+# Custom target
 sudo enhanced_automated_backups.sh restore <archive_name> /mnt/restore-drill
 ```
 
 **Example:**
 ```bash
-sudo enhanced_automated_backups.sh restore debian-2026-04-25_08:20:17 /mnt/restore-drill
+sudo enhanced_automated_backups.sh restore debian-2026-06-17_02:00:45 /mnt/restore-drill
 ```
 
-The extraction is idempotent – running the same command again will overwrite the target directory with the exact same contents, leaving it in a consistent state.
+The extraction is idempotent — running the same command again overwrites the target directory with the exact same contents, leaving it in a consistent state.
+
+> **Note on database dumps:** If `DB_TYPE` is set, database dump files are included inside the archive under the `DB_DUMP_DIR` path (default `/tmp/ukwinika-db-dump`). When comparing the restore against the original filesystem, exclude this path from your diff to avoid false mismatches.
 
 ---
 
@@ -58,18 +61,18 @@ Choose one or more verification methods:
 
 ### a) Compare with original files (if the original is still available)
 ```bash
-diff -rq /original/path /tmp/restore_<archive_name>/original/path
+diff -rq /etc /tmp/restore_<archive_name>/etc
 ```
 No output means the files are identical.
 
 ### b) Check SHA256 checksums against the audit log
-The audit log (`/var/log/UKwinikaBackup_audit.log`) contains checksums of all repository files at backup time. You can compare specific files:
+The audit log (`/var/log/UKwinikaBackup_audit.log`) contains checksums of all repository files recorded at backup time. Compare a specific file:
 ```bash
 sha256sum /tmp/restore_<archive_name>/path/to/file
 grep "path/to/file" /var/log/UKwinikaBackup_audit.log
 ```
 
-### c) Spot‑check key configuration files
+### c) Spot-check key configuration files
 ```bash
 diff /etc/fstab /tmp/restore_<archive_name>/etc/fstab
 cat /tmp/restore_<archive_name>/etc/hostname
@@ -78,13 +81,15 @@ cat /tmp/restore_<archive_name>/etc/hostname
 ### d) Browse the extracted archive interactively
 ```bash
 ls -la /tmp/restore_<archive_name>/
-less /tmp/restore_<archive_name>/etc/shadow
+cat /tmp/restore_<archive_name>/etc/os-release
 ```
 
-### e) (Advanced) Mount the entire archive as a filesystem and compare
+> **Note:** Avoid browsing sensitive files like `/etc/shadow` interactively in a drill — use checksum comparison (method b) or `diff` (method a) instead.
+
+### e) (Advanced) Mount the archive as a read-only filesystem and compare
 ```bash
 sudo mkdir -p /mnt/borg-restore
-sudo borg mount /UKwinikaBackup/borg-repo::debian-2026-04-25_08:20:17 /mnt/borg-restore
+sudo borg mount /UKwinikaBackup/borg-repo::debian-2026-06-17_02:00:45 /mnt/borg-restore
 diff -rq /etc /mnt/borg-restore/etc
 sudo borg umount /mnt/borg-restore
 ```
@@ -101,16 +106,16 @@ rm -rf /tmp/restore_<archive_name>
 rm -rf /mnt/restore-drill
 ```
 
-If you used a Borg mount for verification, ensure it is unmounted (`borg umount` as above).
+If you used a Borg mount for verification, ensure it is unmounted (`borg umount` as above) before removing the mount point.
 
 ---
 
 ## 5. Document the Drill
 
 - [ ] Record the date, archive name, and result (success / failure) in a maintenance log.
-- [ ] If any discrepancies were found, investigate immediately and consider running a full repository check and a fresh backup.
+- [ ] Note the script version used (`grep '^# Version' /usr/local/bin/enhanced_automated_backups.sh`).
+- [ ] If any discrepancies were found, investigate immediately and consider running a full repository check (`sudo enhanced_automated_backups.sh check`) followed by a fresh backup.
 
 ---
 
-> **UKwinika Notable Advice:** Remember A Backup is Only as Good as its Last Successful Restore. Performing this Drill Monthly Guarantees you can Recover with confidence when a Real Disaster Strikes.
-```
+> **UKwinika Notable Advice:** Remember — A Backup is Only as Good as its Last Successful Restore. Performing this Drill Monthly Guarantees You Can Recover with Confidence when a Real Disaster Strikes.
