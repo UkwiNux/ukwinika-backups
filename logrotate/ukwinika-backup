@@ -1,4 +1,8 @@
 # /etc/logrotate.d/ukwinika-backup
+# UKwinika Backup Log Rotation – v3.2
+# Installed by: sudo make systemd
+# Rotates both the main log and the audit log daily, keeping 14 compressed copies.
+
 /var/log/UKwinikaBackup.log
 /var/log/UKwinikaBackup_audit.log {
     daily
@@ -10,8 +14,10 @@
     create 640 root adm
     sharedscripts
     postrotate
-        if [ -f /var/run/rsyslogd.pid ]; then
-            kill -HUP $(cat /var/run/rsyslogd.pid 2>/dev/null) 2>/dev/null || true
+        # /run/rsyslogd.pid is the correct path on systemd-based systems.
+        # /var/run is a symlink to /run on modern distros, so both resolve the same way.
+        if [ -f /run/rsyslogd.pid ]; then
+            kill -HUP "$(cat /run/rsyslogd.pid 2>/dev/null)" 2>/dev/null || true
         fi
     endscript
 }
