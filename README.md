@@ -56,8 +56,11 @@ ukwinika-backups/
 
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
+
 cd ukwinika-backups
+
 sudo make install        # Installs script and dependencies (borgbackup, inotify-tools)
+
 sudo make systemd        # Deploys systemd units and logrotate
 ```
 
@@ -71,7 +74,9 @@ Then follow the full setup below.
 
 ```bash
 sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
+
 sudo chmod 600 /etc/ukwinika-backup.secrets
+
 sudo nano /etc/ukwinika-backup.secrets
 ```
 
@@ -81,7 +86,9 @@ Set `BORG_PASSPHRASE` to a strong, unique passphrase. Optionally add `SLACK_WEBH
 
 ```bash
 sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
+
 sudo chmod 600 /etc/ukwinika-backup.conf
+
 sudo nano /etc/ukwinika-backup.conf
 ```
 
@@ -99,6 +106,7 @@ Creates the repository at the path set in `BORG_REPO` (default `/UKwinikaBackup/
 
 ```bash
 sudo enhanced_automated_backups.sh backup
+
 sudo tail -f /var/log/UKwinikaBackup.log
 ```
 
