@@ -1,1 +1,39 @@
+# UKwinika Automated Restore Test Service – v1.0
+# Installed by: sudo make systemd
+# Triggered by: ukwinika-restore-test.timer (monthly on the 15th at 02:30)
+# Run manually:  sudo systemctl start ukwinika-restore-test.service
+#
+# Scheduled for the 15th of each month at 02:30, offset from the daily
+# backup timer (02:00) so the two never run simultaneously.
+
+[Unit]
+Description=UKwinika Automated Monthly Restore Drill
+After=network-online.target
+Wants=network-online.target
+# Do not start if a backup is currently running.
+After=ukwinika-backup.service
+
+[Service]
+Type=oneshot
+
+Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
+Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
+
+ExecStart=/usr/local/bin/ukwinika_automated_restore.sh test
+
+User=root
+
+# Same resource priority as the backup service — this is a background task.
+Nice=19
+IOSchedulingClass=idle
+
+# Isolated /tmp so temporary files do not leak between runs.
+PrivateTmp=true
+
+# Harden: allow writes only to expected paths.
+# Adjust ReadWritePaths if RESTORE_TARGET_BASE or log paths differ.
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/lock /var/lib/ukwinika /var/lib/prometheus /UKwinikaBackup /tmp
+ProtectHome=read-only
+NoNewPrivileges=true
 
