@@ -7,9 +7,10 @@
 
 .PHONY: install uninstall systemd clean deps
 
-INSTALL_DIR  = /usr/local/bin
-SCRIPT       = enhanced_automated_backups.sh
-SYSTEMD_DIR  = /etc/systemd/system
+INSTALL_DIR   = /usr/local/bin
+SCRIPT        = enhanced_automated_backups.sh
+RESTORE_SCRIPT = ukwinika_automated_restore.sh
+SYSTEMD_DIR   = /etc/systemd/system
 LOGROTATE_DIR = /etc/logrotate.d
 
 # ---------------------------------------------------------------------------
@@ -37,34 +38,48 @@ deps:
 	fi
 
 # ---------------------------------------------------------------------------
-# install – copy script and set permissions (depends on deps)
+# install – copy both scripts and set permissions (depends on deps)
 # ---------------------------------------------------------------------------
 install: deps
 	@sudo install -m 700 $(SCRIPT) $(INSTALL_DIR)/
-	@echo "✅ Script installed to $(INSTALL_DIR)/$(SCRIPT)"
+	@echo "✅ Backup script installed to $(INSTALL_DIR)/$(SCRIPT)"
+	@sudo install -m 700 $(RESTORE_SCRIPT) $(INSTALL_DIR)/
+	@echo "✅ Restore script installed to $(INSTALL_DIR)/$(RESTORE_SCRIPT)"
 	@echo "✅ Smart idempotent edition with full 3-2-1 backup strategy, safe restore, and lock cleanup."
 
 # ---------------------------------------------------------------------------
-# uninstall – remove the installed script
+# uninstall – remove both installed scripts
 # ---------------------------------------------------------------------------
 uninstall:
 	@sudo rm -f $(INSTALL_DIR)/$(SCRIPT)
-	@echo "✅ Script removed from $(INSTALL_DIR)"
+	@echo "✅ Backup script removed from $(INSTALL_DIR)"
+	@sudo rm -f $(INSTALL_DIR)/$(RESTORE_SCRIPT)
+	@echo "✅ Restore script removed from $(INSTALL_DIR)"
 
 # ---------------------------------------------------------------------------
-# systemd – deploy service units and logrotate configuration
+# systemd – deploy all service units and logrotate configuration
 # ---------------------------------------------------------------------------
 systemd:
 	@sudo cp systemd/* $(SYSTEMD_DIR)/
 	@sudo cp logrotate/ukwinika-backup $(LOGROTATE_DIR)/
 	@sudo systemctl daemon-reload
 	@echo "✅ Systemd services and logrotate installed"
-	@echo "   Enable the daily timer with:  sudo systemctl enable --now ukwinika-backup.timer"
-	@echo "   Enable real-time monitoring:  sudo systemctl enable --now ukwinika-realtime-backup.service"
+	@echo ""
+	@echo "   Backup — enable the daily timer:"
+	@echo "     sudo systemctl enable --now ukwinika-backup.timer"
+	@echo ""
+	@echo "   Backup — enable real-time monitoring (optional):"
+	@echo "     sudo systemctl enable --now ukwinika-realtime-backup.service"
+	@echo ""
+	@echo "   Restore drill — enable the monthly timer:"
+	@echo "     sudo systemctl enable --now ukwinika-restore-test.timer"
 
 # ---------------------------------------------------------------------------
-# clean – remove runtime logs
+# clean – remove runtime logs and restore drill directories
 # ---------------------------------------------------------------------------
 clean:
 	@sudo rm -f /var/log/UKwinikaBackup*.log
+	@sudo rm -f /var/log/UKwinikaRestore*.log
 	@echo "✅ Logs cleaned"
+	@sudo $(INSTALL_DIR)/$(RESTORE_SCRIPT) clean 2>/dev/null || true
+	@echo "✅ Restore drill directories cleaned"
