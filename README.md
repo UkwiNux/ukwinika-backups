@@ -1,6 +1,6 @@
 # UKwinika Enhanced Automated Backup Script (EABS)
 
-**A 3‑2‑1 Backup Solution** built on BorgBackup with real-time monitoring, database dumps, AES-256 encryption, audit trails, Prometheus metrics, cloud support, and automated monthly restore verification.
+**A 3‑2‑1 Backup Solution** built on BorgBackup with **Real-Time Monitoring**, **Database Dumps**, **AES-256 Encryption**, **Audit Trails**, **Prometheus Metrics**, **Cloud Support**, and **Automated Monthly Restore** verification.
 
 **Author:** **Urayayi Kwinika** | **Version:** 3.2.1 | **License:** MIT
 
@@ -29,7 +29,7 @@
 
 ```
 ukwinika-backups/
-├── enhanced_automated_backups.sh          # Main backup script (v3.2)
+├── enhanced_automated_backups.sh          # Main backup script 
 ├── Makefile                               # Install, deps, systemd, clean
 ├── README.md
 ├── CHANGELOG.md
@@ -40,7 +40,7 @@ ukwinika-backups/
 │   ├── ukwinika-backup.conf.example       # Non-sensitive configuration template
 │   └── ukwinika-backup.secrets.example    # Sensitive credentials template
 ├── backuprestore/
-│   ├── ukwinika_automated_restore.sh      # Automated monthly restore drill (v1.0)
+│   ├── ukwinika_automated_restore.sh      # Automated monthly restore drill 
 │   ├── ukwinika-restore-test.service      # Systemd oneshot service for the drill
 │   └── ukwinika-restore-test.timer        # Monthly timer (15th of each month, 02:30)
 ├── systemd/
@@ -65,12 +65,14 @@ git clone https://github.com/UkwiNux/ukwinika-backups.git
 
 cd ukwinika-backups
 
-sudo make install        # Installs both scripts and dependencies
+# Installs both scripts and dependencies
+sudo make install        
 
-sudo make systemd        # Deploys all systemd units and logrotate
+# Deploys all systemd units and logrotate
+sudo make systemd        
 ```
 
-Then follow the full setup below.
+Follow the full setup below.
 
 ---
 
@@ -130,7 +132,7 @@ sudo systemctl enable --now ukwinika-realtime-backup.service
 
 Watches directories in `REAL_TIME_DIRS` (default `/etc` and `/home`) and triggers a backup on any file change.
 
-### 7. Enable automated monthly restore drills
+### 7. Enable Automated Monthly Restore Drills
 
 ```bash
 sudo systemctl enable --now ukwinika-restore-test.timer
@@ -228,7 +230,7 @@ On each run the script:
 
 All six checks run regardless of individual failures, so the complete picture is always captured in a single run.
 
-### Restore drill configuration
+### Restore Drill Configuration
 
 Add any of these to `/etc/ukwinika-backup.conf`:
 
@@ -302,7 +304,7 @@ Archive names follow the pattern: `<hostname>-<YYYY-MM-DD_HH:MM:SS>`
 
 ## How to Restore a File or Folder
 
-### Using the backup script (recommended)
+### Using the Backup Script (recommended)
 
 ```bash
 # Restore an entire archive to a safe location
