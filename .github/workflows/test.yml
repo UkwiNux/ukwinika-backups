@@ -20,21 +20,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y borgbackup rsync inotify-tools mailutils
 
-      - name: Make script executable
-        run: chmod +x enhanced_automated_backups.sh
+      - name: Make scripts executable
+        run: |
+          chmod +x enhanced_automated_backups.sh
+          chmod +x backuprestore/ukwinika_automated_restore.sh
 
-      - name: Bash syntax check
+      - name: Bash syntax check — backup script
         run: bash -n enhanced_automated_backups.sh
 
-      - name: Basic invocation test (list against temp repo)
+      - name: Bash syntax check — restore script
+        run: bash -n backuprestore/ukwinika_automated_restore.sh
+
+      - name: Functional smoke test — backup and restore drill
         run: |
-          # Create a minimal secrets + config so the script can load cleanly.
           REPO=$(mktemp -d)
           SECRETS=$(mktemp)
           CONFIG=$(mktemp)
 
           echo "BORG_PASSPHRASE=ci-test-passphrase" > "$SECRETS"
-          cat > "$CONFIG" << EOF
+          cat > "$CONFIG" << CONFEOF
           BORG_REPO="${REPO}/borg-repo"
           BACKUP_PATHS=("/tmp")
           EXCLUDE_DIRS=()
@@ -52,18 +56,29 @@ jobs:
           EMAIL_TO=""
           METRICS_ENABLED="no"
           PROMETHEUS_FILE="${REPO}/ukwinika_backup.prom"
-          EOF
+          RESTORE_TARGET_BASE="${REPO}/restore-drills"
+          RESTORE_VERIFY_PATHS="tmp"
+          RESTORE_MIN_FILES=1
+          RESTORE_KEEP_ON_FAILURE="no"
+          RESTORE_DRILL_LOG="${REPO}/restore.log"
+          CONFEOF
 
           export UKW_CONFIG="$CONFIG"
           export UKW_SECRETS="$SECRETS"
           export BORG_PASSPHRASE="ci-test-passphrase"
 
-          # Initialise repo and verify list works
+          # Backup smoke test
           borg init --encryption=repokey "${REPO}/borg-repo"
           bash enhanced_automated_backups.sh list
-          echo "✅ Basic validation passed"
+          bash enhanced_automated_backups.sh backup
+          bash enhanced_automated_backups.sh list
+          bash enhanced_automated_backups.sh check
 
-          # Clean up
+          # Restore drill smoke test against the archive just created
+          bash backuprestore/ukwinika_automated_restore.sh list
+          bash backuprestore/ukwinika_automated_restore.sh test
+
+          echo "✅ Backup and restore drill smoke tests passed"
           rm -rf "$REPO" "$SECRETS" "$CONFIG"
 
       - name: Check example config and secrets files exist
@@ -72,15 +87,23 @@ jobs:
           test -f config/ukwinika-backup.secrets.example
           echo "✅ Config examples present"
 
-      - name: Verify all documented variables are present in the conf example
+      - name: Verify all documented variables present in conf.example
         run: |
           for var in BORG_REPO BACKUP_PATHS EXCLUDE_DIRS RETENTION_DAYS \
                      RETENTION_VERSIONS USB_MOUNT USB_RSYNC_TARGET CLOUD_REMOTE \
                      DB_TYPE DB_DUMP_DIR PRE_HOOK POST_HOOK HOOK_FAIL_ACTION \
                      REAL_TIME_DIRS EMAIL_TO METRICS_ENABLED PROMETHEUS_FILE \
-                     CHECKSUM_FILE; do
+                     CHECKSUM_FILE RESTORE_TARGET_BASE RESTORE_VERIFY_PATHS \
+                     RESTORE_MIN_FILES RESTORE_KEEP_ON_FAILURE RESTORE_DRILL_LOG; do
             grep -q "^${var}=" config/ukwinika-backup.conf.example \
               || grep -q "^# ${var}" config/ukwinika-backup.conf.example \
               || (echo "MISSING in conf.example: ${var}" && exit 1)
           done
           echo "✅ All variables accounted for in conf.example"
+
+      - name: Verify backuprestore folder contains all expected files
+        run: |
+          test -f backuprestore/ukwinika_automated_restore.sh
+          test -f backuprestore/ukwinika-restore-test.service
+          test -f backuprestore/ukwinika-restore-test.timer
+          echo "✅ backuprestore/ folder is complete"
