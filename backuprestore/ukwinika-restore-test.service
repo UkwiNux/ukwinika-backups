@@ -1,39 +1,111 @@
-# UKwinika Automated Restore Test Service – v1.0
-# Installed by: sudo make systemd
-# Triggered by: ukwinika-restore-test.timer (monthly on the 15th at 02:30)
-# Run manually:  sudo systemctl start ukwinika-restore-test.service
-#
-# Scheduled for the 15th of each month at 02:30, offset from the daily
-# backup timer (02:00) so the two never run simultaneously.
+# =============================================================================
+# UKwinika Backup Configuration Example – v3.2.1 Idempotent Edition
+# Copy to /etc/ukwinika-backup.conf and adjust.
+# STRICTLY no secrets in this file — all credentials go in ukwinika-backup.secrets.
+# Permissions: sudo chmod 600 /etc/ukwinika-backup.conf
+# =============================================================================
 
-[Unit]
-Description=UKwinika Automated Monthly Restore Drill
-After=network-online.target
-Wants=network-online.target
-# Do not start if a backup is currently running.
-After=ukwinika-backup.service
+# ---------- Borg Repository Path (Primary Copy) -----------------------------
+BORG_REPO="/UKwinikaBackup/borg-repo"
 
-[Service]
-Type=oneshot
+# ---------- Paths to Back Up (Bash array) -----------------------------------
+# Default: entire root filesystem, minus the exclusions below.
+BACKUP_PATHS=("/")
 
-Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
-Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
+# ---------- Exclude Patterns (Bash array) -----------------------------------
+# Each entry becomes an --exclude argument for borg create.
+# This is the single source of truth — do not add exclusions anywhere else.
+EXCLUDE_DIRS=(
+    "/proc"
+    "/sys"
+    "/dev"
+    "/tmp"
+    "/run"
+    "/mnt"
+    "/media"
+    "/lost+found"
+    "/var/cache"
+    "/var/tmp"
+    "/home/*/.cache"
+)
 
-ExecStart=/usr/local/bin/ukwinika_automated_restore.sh test
+# ---------- Retention Policy ------------------------------------------------
+RETENTION_DAYS=90        # keep all archives created within this many days
+RETENTION_VERSIONS=5     # minimum number of recent archives to keep regardless of age
 
-User=root
+# ---------- USB Secondary Copy ----------------------------------------------
+USB_MOUNT="/mnt/backup_usb"
+USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"
+# Leave USB_RSYNC_TARGET empty to skip the secondary USB copy.
 
-# Same resource priority as the backup service — this is a background task.
-Nice=19
-IOSchedulingClass=idle
+# ---------- Cloud Tertiary Copy (rclone) ------------------------------------
+# Set to a configured rclone remote + path, e.g. "s3:my-borg-backups"
+# Leave empty to skip the cloud upload.
+CLOUD_REMOTE=""
 
-# Isolated /tmp so temporary files do not leak between runs.
-PrivateTmp=true
+# ---------- Database Dump ---------------------------------------------------
+# Supported values: none, mysql, postgresql, mongodb
+# Any other value aborts the backup immediately for data safety.
+DB_TYPE="none"
 
-# Harden: allow writes only to expected paths.
-# Adjust ReadWritePaths if RESTORE_TARGET_BASE or log paths differ.
-ProtectSystem=strict
-ReadWritePaths=/var/log /var/lock /var/lib/ukwinika /var/lib/prometheus /UKwinikaBackup /tmp
-ProtectHome=read-only
-NoNewPrivileges=true
+# Directory where database dumps are written before being included in the archive.
+# Wiped and recreated on every run (idempotent).
+DB_DUMP_DIR="/tmp/ukwinika-db-dump"
 
+# ---------- Hooks -----------------------------------------------------------
+PRE_HOOK="/etc/ukwinika/pre_backup_hook.sh"
+POST_HOOK="/etc/ukwinika/post_backup_hook.sh"
+# fatal  → abort the backup if the hook exits non-zero
+# warn   → log a warning and continue
+HOOK_FAIL_ACTION="fatal"
+
+# ---------- Real-Time Monitoring Directories --------------------------------
+# Bash array of directories watched by inotifywait in real-time mode.
+REAL_TIME_DIRS=("/etc" "/home")
+
+# ---------- Notifications (Non-Secret Recipients) ---------------------------
+# EMAIL_TO can also be placed in the secrets file if the address is sensitive.
+EMAIL_TO="admin@example.com"
+
+# ---------- Prometheus Metrics ----------------------------------------------
+METRICS_ENABLED="yes"
+PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
+# The parent directory of PROMETHEUS_FILE is created automatically if missing.
+
+# ---------- Audit Checksum File ---------------------------------------------
+# Path where SHA256 checksums of all repository objects are written after backup.
+CHECKSUM_FILE="/tmp/ukwinika-backup-checksums.txt"
+
+# =============================================================================
+# Automated Restore Drill (ukwinika_automated_restore.sh)
+# All variables below are optional — defaults are shown and are safe as-is.
+# =============================================================================
+
+# ---------- Restore Drill Target Directory -----------------------------------
+# Base directory under which each drill creates its own timestamped subdirectory.
+# The restore script never writes outside this path — live data is unreachable.
+# The directory is created automatically on first run.
+RESTORE_TARGET_BASE="/var/lib/ukwinika/restore-drills"
+
+# ---------- Mandatory Paths --------------------------------------------------
+# Space-separated list of paths RELATIVE to the archive root that must exist
+# in the restored data for the drill to pass check 2.
+# Adjust if your BACKUP_PATHS does not include the default locations.
+RESTORE_VERIFY_PATHS="etc/hostname etc/os-release etc/fstab"
+
+# ---------- Minimum File Count -----------------------------------------------
+# The restore must contain at least this many files for check 3 to pass.
+# Raise this value if your backup typically contains many more files.
+RESTORE_MIN_FILES=100
+
+# ---------- Keep Drill Directory on Failure ----------------------------------
+# yes  → preserve the drill directory when any check fails so you can inspect
+#         the extracted content before deciding how to respond (recommended).
+# no   → always remove the drill directory regardless of result.
+RESTORE_KEEP_ON_FAILURE="yes"
+
+# ---------- Restore Drill Log ------------------------------------------------
+# Dedicated log file for restore drill output.
+# Drill events are also tee'd to /var/log/UKwinikaBackup.log so the full
+# backup-and-verify lifecycle is visible in a single log stream.
+RESTORE_DRILL_LOG="/var/log/UKwinikaRestore.log"
