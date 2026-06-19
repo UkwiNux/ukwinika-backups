@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v3.2.1] – 2026-06-18
+
+### Added
+- **`backuprestore/` folder** – groups the automated restore drill and its systemd units together in a dedicated directory for clarity. Contains:
+  - **`ukwinika_automated_restore.sh` (v1.0)** — automated monthly restore drill script. Sources the same `UKW_CONFIG` and `UKW_SECRETS` as the backup script; no separate configuration required. Runs six independent verification checks (non-empty extraction, mandatory paths, minimum file count, SHA256 spot-check against the audit log, zero-byte file detection, archive metadata readability) and reports results via the existing Slack/email channels and four new Prometheus metrics. Exit code 0 = all checks passed; exit code 1 = one or more checks failed or a fatal error occurred.
+  - **`ukwinika-restore-test.service`** — oneshot systemd service that executes `ukwinika_automated_restore.sh test`. Carries the same hardening profile as `ukwinika-backup.service` (`ProtectSystem=strict`, `NoNewPrivileges=true`, `PrivateTmp=true`, `Nice=19`, `IOSchedulingClass=idle`). Uses a separate lock file (`/var/lock/ukwinika-restore-test.lock`) so it never conflicts with a running backup.
+  - **`ukwinika-restore-test.timer`** — fires on the 15th of each month at 02:30 ± 30 min. Offset from the daily backup timer (02:00) so the two never overlap. `Persistent=true` ensures a missed drill runs as soon as the system comes back online.
+- **Five new restore-specific configuration variables** (all optional, added to `ukwinika-backup.conf`): `RESTORE_TARGET_BASE`, `RESTORE_VERIFY_PATHS`, `RESTORE_MIN_FILES`, `RESTORE_KEEP_ON_FAILURE`, `RESTORE_DRILL_LOG`.
+- **Four new Prometheus metrics** written by the restore script and appended to the existing `PROMETHEUS_FILE`: `ukwinika_restore_test_last_run_seconds`, `ukwinika_restore_test_last_result` (1=pass/0=fail, archive label), `ukwinika_restore_test_checks_passed`, `ukwinika_restore_test_checks_failed`.
+- **Dedicated restore log** at `/var/log/UKwinikaRestore.log` — restore drill output is written here in addition to the shared `/var/log/UKwinikaBackup.log`, so the full backup-and-verify timeline remains visible in one place.
+
+### Changed
+- **Makefile updated to v3.2.1** — `RESTORE_SCRIPT` now points to `backuprestore/ukwinika_automated_restore.sh`. The `systemd` target explicitly copies `backuprestore/ukwinika-restore-test.service` and `backuprestore/ukwinika-restore-test.timer` to `/etc/systemd/system/` in addition to the existing `systemd/*` units. The `clean` target now also removes `/var/log/UKwinikaRestore*.log` and calls `ukwinika_automated_restore.sh clean` to purge drill directories.
+- **`install` target** installs `ukwinika_automated_restore.sh` from `backuprestore/` to `/usr/local/bin/` alongside the backup script.
+- **`uninstall` target** removes both installed scripts.
+- **README and documentation updated** — repository structure, feature list, setup steps, configuration reference, systemd table, Prometheus metrics section, and troubleshooting table all reflect the new `backuprestore/` folder and restore drill capability.
+
+---
+
 ## [v3.2] – 2026-06-17
 
 ### Added
