@@ -194,11 +194,13 @@ Every change must pass `shellcheck enhanced_automated_backups.sh` with zero warn
 Run the following checks locally and confirm they all pass:
 
 ```bash
-# 1. Bash syntax check
+# 1. Bash syntax check — both scripts
 bash -n enhanced_automated_backups.sh
+bash -n backuprestore/ukwinika_automated_restore.sh
 
-# 2. Static analysis
+# 2. Static analysis — both scripts
 shellcheck enhanced_automated_backups.sh
+shellcheck backuprestore/ukwinika_automated_restore.sh
 
 # 3. Functional smoke test against a temporary repository
 REPO=$(mktemp -d)
@@ -224,17 +226,27 @@ REAL_TIME_DIRS=("/tmp")
 EMAIL_TO=""
 METRICS_ENABLED="no"
 PROMETHEUS_FILE="${REPO}/ukwinika_backup.prom"
+RESTORE_TARGET_BASE="${REPO}/restore-drills"
+RESTORE_VERIFY_PATHS="tmp"
+RESTORE_MIN_FILES=1
+RESTORE_KEEP_ON_FAILURE="no"
+RESTORE_DRILL_LOG="${REPO}/restore.log"
 EOF
 
 export UKW_CONFIG="$CONFIG"
 export UKW_SECRETS="$SECRETS"
 export BORG_PASSPHRASE="local-test-passphrase"
 
+# Backup smoke test
 borg init --encryption=repokey "${REPO}/borg-repo"
 bash enhanced_automated_backups.sh list
 bash enhanced_automated_backups.sh backup
 bash enhanced_automated_backups.sh list
 bash enhanced_automated_backups.sh check
+
+# Restore drill smoke test — runs against the archive just created above
+bash backuprestore/ukwinika_automated_restore.sh list
+bash backuprestore/ukwinika_automated_restore.sh test
 
 rm -rf "$REPO" "$SECRETS" "$CONFIG"
 ```
@@ -245,9 +257,10 @@ All commands must exit 0.
 
 The CI pipeline (`.github/workflows/test.yml`) runs automatically on every push and pull request to `main`. It performs:
 
-- Bash syntax check (`bash -n`)
-- Functional invocation test against a real temporary Borg repository
-- Verification that all documented configuration variables are present in `config/ukwinika-backup.conf.example`
+- Bash syntax check (`bash -n`) on both `enhanced_automated_backups.sh` and `backuprestore/ukwinika_automated_restore.sh`
+- Static analysis (`shellcheck`) on both scripts
+- Functional invocation test of both scripts against a real temporary Borg repository
+- Verification that all documented configuration variables — including all five `RESTORE_*` variables — are present in `config/ukwinika-backup.conf.example`
 
 A pull request will not be merged if CI is failing. Do not ask for an exception.
 
@@ -264,7 +277,11 @@ If your change touches any of the following areas, include a description in your
 | `restore_backup()` | Verify restored contents match originals via `diff -rq` |
 | `push_metrics()` | Verify the `.prom` file is valid and parseable by Node Exporter |
 | Hook execution | Test both `fatal` and `warn` failure action paths |
-| Systemd units | Validate with `systemd-analyze verify <unit_file>` |
+| Any verification check in restore script | Confirm the check correctly detects both a passing and a failing condition |
+| `push_restore_metrics()` | Verify four new metrics appear in `PROMETHEUS_FILE` after a drill |
+| `notify_restore()` | Verify Slack payload and email body contain archive name and check counts |
+| Systemd units | Validate all five units with `systemd-analyze verify <unit_file>` |
+| `backuprestore/` path changes | Run `sudo make install` and `sudo make systemd` on a clean system and confirm both scripts land in `/usr/local/bin/` and all five units are in `/etc/systemd/system/` |
 
 ---
 
@@ -274,10 +291,12 @@ If your change touches any of the following areas, include a description in your
 
 - [ ] Your branch is based on the latest `main`.
 - [ ] `bash -n enhanced_automated_backups.sh` exits 0.
+- [ ] `bash -n backuprestore/ukwinika_automated_restore.sh` exits 0.
 - [ ] `shellcheck enhanced_automated_backups.sh` exits 0 with no warnings.
-- [ ] The functional smoke test (section 9) passes in full.
+- [ ] `shellcheck backuprestore/ukwinika_automated_restore.sh` exits 0 with no warnings.
+- [ ] The full functional smoke test (section 9) passes, including the restore drill portion.
 - [ ] `CHANGELOG.md` has been updated under `[Unreleased]` (see [Changelog Requirements](#13-changelog-requirements)).
-- [ ] `config/ukwinika-backup.conf.example` has been updated if you added or changed any configuration variable.
+- [ ] `config/ukwinika-backup.conf.example` has been updated if you added or changed any configuration variable in either script.
 - [ ] All documentation affected by your change has been updated to reflect the new behaviour.
 - [ ] Your commit messages follow the format in [section 11](#11-commit-message-format).
 
