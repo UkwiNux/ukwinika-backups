@@ -1,10 +1,10 @@
 # UKwinika Backup – Monthly Restore Drill Checklist
 
-**Version:** v3.2
+**Version:** v3.2.1
 **Purpose:** Confirm that backups are complete, restorable, and free of silent corruption.
 **Frequency:** At least once per month, and after any major system change (OS upgrade, storage migration, configuration overhaul).
 
-This checklist uses the idempotent restore features of UKwinika EABS v3.2 — you can repeat the drill without risk to live data.
+This checklist uses the idempotent restore features of UKwinika EABS v3.2.1 — you can repeat the drill without risk to live data.
 
 ---
 
