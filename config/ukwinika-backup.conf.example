@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Configuration Example – v3.2 Idempotent Edition
+# UKwinika Backup Configuration Example – v3.2.1 Idempotent Edition
 # Copy to /etc/ukwinika-backup.conf and adjust.
 # STRICTLY no secrets in this file — all credentials go in ukwinika-backup.secrets.
 # Permissions: sudo chmod 600 /etc/ukwinika-backup.conf
@@ -75,3 +75,37 @@ PROMETHEUS_FILE="/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom"
 # ---------- Audit Checksum File ---------------------------------------------
 # Path where SHA256 checksums of all repository objects are written after backup.
 CHECKSUM_FILE="/tmp/ukwinika-backup-checksums.txt"
+
+# =============================================================================
+# Automated Restore Drill (ukwinika_automated_restore.sh)
+# All variables below are optional — defaults are shown and are safe as-is.
+# =============================================================================
+
+# ---------- Restore Drill Target Directory -----------------------------------
+# Base directory under which each drill creates its own timestamped subdirectory.
+# The restore script never writes outside this path — live data is unreachable.
+# The directory is created automatically on first run.
+RESTORE_TARGET_BASE="/var/lib/ukwinika/restore-drills"
+
+# ---------- Mandatory Paths --------------------------------------------------
+# Space-separated list of paths RELATIVE to the archive root that must exist
+# in the restored data for the drill to pass check 2.
+# Adjust if your BACKUP_PATHS does not include the default locations.
+RESTORE_VERIFY_PATHS="etc/hostname etc/os-release etc/fstab"
+
+# ---------- Minimum File Count -----------------------------------------------
+# The restore must contain at least this many files for check 3 to pass.
+# Raise this value if your backup typically contains many more files.
+RESTORE_MIN_FILES=100
+
+# ---------- Keep Drill Directory on Failure ----------------------------------
+# yes  → preserve the drill directory when any check fails so you can inspect
+#         the extracted content before deciding how to respond (recommended).
+# no   → always remove the drill directory regardless of result.
+RESTORE_KEEP_ON_FAILURE="yes"
+
+# ---------- Restore Drill Log ------------------------------------------------
+# Dedicated log file for restore drill output.
+# Drill events are also tee'd to /var/log/UKwinikaBackup.log so the full
+# backup-and-verify lifecycle is visible in a single log stream.
+RESTORE_DRILL_LOG="/var/log/UKwinikaRestore.log"
