@@ -2,26 +2,26 @@
 
 **A 3‑2‑1 Backup Solution** built on BorgBackup with real-time monitoring, database dumps, AES-256 encryption, audit trails, Prometheus metrics, cloud support, and automated monthly restore verification.
 
-**Author:** Urayayi Kwinika | **Version:** 3.2.1 | **License:** MIT
+**Author:** **Urayayi Kwinika** | **Version:** 3.2.1 | **License:** MIT
 
 ---
 
 ## Features
 
-- **Fully idempotent** – safe to run any number of times; no stale locks, no duplicate side effects.
+- **Fully Idempotent** – safe to run any number of times; no stale locks, no duplicate side effects.
 - **3‑2‑1 Backup** – primary on disk (Borg), secondary on removable USB (rsync mirror), tertiary to cloud (rclone).
 - **BorgBackup** – deduplication, lz4 compression, AES‑256 `repokey` encryption, mountable archives.
-- **Safe restore & drill mode** – extracts archives to an isolated target directory; live data is never touched by default.
-- **Automated restore verification** – `ukwinika_automated_restore.sh` runs six verification checks against the most recent archive and reports results via Slack, email, and Prometheus.
-- **Real‑time monitoring** – inotify triggers a full backup on file change, using a lock-safe child process.
+- **Safe Restore & Drill Mode** – extracts archives to an isolated target directory; live data is never touched by default.
+- **Automated Restore verification** – `ukwinika_automated_restore.sh` runs six verification checks against the most recent archive and reports results via Slack, email, and Prometheus.
+- **Real‑Time Monitoring** – inotify triggers a full backup on file change, using a lock-safe child process.
 - **Database-aware** – pre-backup dumps for MySQL, PostgreSQL, and MongoDB; unknown `DB_TYPE` aborts immediately.
-- **Pre/post hooks** – custom scripts before and after each backup, with configurable failure behaviour.
-- **Failure notifications** – Slack and email alerts fire on both backup and restore drill success and failure.
-- **Prometheus metrics** – backup and restore drill metrics written to the same textfile collector output.
-- **SHA256 audit trail** – checksums of all repository objects logged after every backup and every drill.
-- **Stale lock prevention** – separate lock files for backup and restore; each is automatically removed on exit.
-- **Systemd & logrotate** – five units and log rotation included and ready to deploy.
-- **Cross-distribution** – Debian, Ubuntu, RHEL, Rocky Linux, AlmaLinux, CentOS.
+- **Pre/Post Hooks** – custom scripts before and after each backup, with configurable failure behaviour.
+- **Failure Notifications** – Slack and email alerts fire on both backup and restore drill success and failure.
+- **Prometheus Metrics** – backup and restore drill metrics written to the same textfile collector output.
+- **SHA256 Audit Trail** – checksums of all repository objects logged after every backup and every drill.
+- **Stale Lock Prevention** – separate lock files for backup and restore; each is automatically removed on exit.
+- **Systemd & Logrotate** – five units and log rotation included and ready to deploy.
+- **Cross-Distribution** – Debian, Ubuntu, RHEL, Rocky Linux, AlmaLinux, CentOS.
 
 ---
 
@@ -62,8 +62,11 @@ ukwinika-backups/
 
 ```bash
 git clone https://github.com/UkwiNux/ukwinika-backups.git
+
 cd ukwinika-backups
+
 sudo make install        # Installs both scripts and dependencies
+
 sudo make systemd        # Deploys all systemd units and logrotate
 ```
 
@@ -77,7 +80,9 @@ Then follow the full setup below.
 
 ```bash
 sudo cp config/ukwinika-backup.secrets.example /etc/ukwinika-backup.secrets
+
 sudo chmod 600 /etc/ukwinika-backup.secrets
+
 sudo nano /etc/ukwinika-backup.secrets
 ```
 
@@ -87,13 +92,15 @@ Set `BORG_PASSPHRASE` to a strong, unique passphrase. Optionally add `SLACK_WEBH
 
 ```bash
 sudo cp config/ukwinika-backup.conf.example /etc/ukwinika-backup.conf
+
 sudo chmod 600 /etc/ukwinika-backup.conf
+
 sudo nano /etc/ukwinika-backup.conf
 ```
 
 Key settings to review: `BORG_REPO`, `BACKUP_PATHS`, `EXCLUDE_DIRS`, `USB_MOUNT`, `USB_RSYNC_TARGET`, `CLOUD_REMOTE`, `DB_TYPE`. See the [Configuration Reference](#configuration-reference) below.
 
-### 3. Initialise the Borg repository
+### 3. Initialise the Borg Repository
 
 ```bash
 sudo enhanced_automated_backups.sh init
@@ -101,20 +108,21 @@ sudo enhanced_automated_backups.sh init
 
 Creates the repository at the path set in `BORG_REPO` (default `/UKwinikaBackup/borg-repo`) using `repokey` encryption. Running this again on an existing valid repository does nothing.
 
-### 4. Test a backup
+### 4. Test a Backup
 
 ```bash
 sudo enhanced_automated_backups.sh backup
+
 sudo tail -f /var/log/UKwinikaBackup.log
 ```
 
-### 5. Enable daily scheduled backups
+### 5. Enable Daily Scheduled Backups
 
 ```bash
 sudo systemctl enable --now ukwinika-backup.timer
 ```
 
-### 6. (Optional) Enable real-time monitoring
+### 6. (Optional) Enable Real-Time Monitoring
 
 ```bash
 sudo systemctl enable --now ukwinika-realtime-backup.service
@@ -128,13 +136,13 @@ Watches directories in `REAL_TIME_DIRS` (default `/etc` and `/home`) and trigger
 sudo systemctl enable --now ukwinika-restore-test.timer
 ```
 
-Runs a full automated restore drill on the 15th of each month at 02:30. Results are written to `/var/log/UKwinikaRestore.log`, the shared audit log, and sent via Slack and email. See [Automated Restore Drill](#automated-restore-drill) below.
+Runs a full Automated Restore Drill on the 15th of each month at 02:30. Results are written to `/var/log/UKwinikaRestore.log`, the shared audit log, and sent via Slack and email. See [Automated Restore Drill](#automated-restore-drill) below.
 
 ---
 
 ## Usage
 
-### Backup script
+### Backup Script
 
 | Command | Description |
 |---|---|
@@ -162,7 +170,7 @@ sudo enhanced_automated_backups.sh list
 sudo enhanced_automated_backups.sh check
 ```
 
-### Restore drill script
+### Restore Drill Script
 
 | Command | Description |
 |---|---|
