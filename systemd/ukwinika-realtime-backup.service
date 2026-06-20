@@ -1,4 +1,4 @@
-# UKwinika Real-Time Backup Monitoring Service – v3.2
+# UKwinika Real-Time Backup Monitoring Service – v3.2.1
 # Installed by: sudo make systemd
 # Enable and start: sudo systemctl enable --now ukwinika-realtime-backup.service
 # View logs:        journalctl -u ukwinika-realtime-backup.service -f
