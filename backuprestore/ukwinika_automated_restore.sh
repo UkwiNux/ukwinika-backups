@@ -3,8 +3,9 @@
 # UKwinika Automated Restore Script
 # Author: Urayayi Kwinika
 # Version: 1.0
+# Project version: 3.2.1
 # Description:
-#   Automated monthly restore drill for UKwinika EABS v3.2 backups.
+#   Automated monthly restore drill for UKwinika EABS v3.2.1 backups.
 #   Implements the full verification workflow from docs/RESTORE-CHECKLIST.md
 #   without human interaction — suitable for scheduled execution via systemd.
 #
@@ -26,6 +27,11 @@
 #   1  Drill failed — at least one verification check failed, or a fatal
 #      error occurred. The restore directory is preserved for inspection
 #      if RESTORE_KEEP_ON_FAILURE=yes.
+#
+# Compatibility:
+#   Uses (cd target && borg extract) instead of borg extract --target,
+#   for compatibility with BorgBackup 1.2.x (Debian 12, Ubuntu 22.04/24.04,
+#   RHEL 9). The --target flag was introduced in BorgBackup 1.4.
 #
 # Configuration (add to /etc/ukwinika-backup.conf):
 #   RESTORE_TARGET_BASE     Base directory for drill extractions.
@@ -59,7 +65,7 @@ UKW_CONFIG="${UKW_CONFIG:-/etc/ukwinika-backup.conf}"
 UKW_SECRETS="${UKW_SECRETS:-/etc/ukwinika-backup.secrets}"
 
 if [[ ! -f "$UKW_CONFIG" ]]; then
-    echo "ERROR: Configuration File ${UKW_CONFIG} not found." >&2
+    echo "ERROR: Configuration file ${UKW_CONFIG} not found." >&2
     exit 1
 fi
 # shellcheck source=/dev/null
@@ -70,7 +76,6 @@ if [[ -f "$UKW_SECRETS" ]]; then
     source "$UKW_SECRETS"
 fi
 
-# BORG_PASSPHRASE is required — same requirement as the backup script.
 : "${BORG_PASSPHRASE:?ERROR: BORG_PASSPHRASE is not set. Check ${UKW_SECRETS}.}"
 export BORG_PASSPHRASE
 
@@ -84,8 +89,6 @@ METRICS_ENABLED="${METRICS_ENABLED:-yes}"
 PROMETHEUS_FILE="${PROMETHEUS_FILE:-/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-/tmp/ukwinika-backup-checksums.txt}"
 
-# Shared log files — restore drill results appear in the same logs as backups
-# so that a single log view covers the full backup-and-verify lifecycle.
 LOG_FILE="/var/log/UKwinikaBackup.log"
 AUDIT_LOG="/var/log/UKwinikaBackup_audit.log"
 
@@ -99,44 +102,39 @@ RESTORE_KEEP_ON_FAILURE="${RESTORE_KEEP_ON_FAILURE:-yes}"
 RESTORE_DRILL_LOG="${RESTORE_DRILL_LOG:-/var/log/UKwinikaRestore.log}"
 
 # =============================================================================
-# Runtime state — set during execution, not configuration
+# Runtime state
 # =============================================================================
-DRILL_DIR=""          # set in run_drill() once the archive name is known
-DRILL_TIMESTAMP=""    # ISO timestamp for this drill run
-DRILL_ARCHIVE=""      # archive name being tested
-PASS_COUNT=0          # number of checks that passed
-FAIL_COUNT=0          # number of checks that failed
+DRILL_DIR=""
+DRILL_TIMESTAMP=""
+DRILL_ARCHIVE=""
+PASS_COUNT=0
+FAIL_COUNT=0
 
 # =============================================================================
 # Logging helpers
-# Mirrors the format used by enhanced_automated_backups.sh exactly so that
-# grepping /var/log/UKwinikaBackup.log shows both backup and restore events
-# in a single consistent timeline.
 # =============================================================================
 log() {
-    local msg="$(date '+%F %T') ${SCRIPT_NAME}: $*"
+    local msg
+    msg="$(date '+%F %T') ${SCRIPT_NAME}: $*"
     echo "$msg" | tee -a "$LOG_FILE" >> "$RESTORE_DRILL_LOG"
 }
 
 audit() {
-    local msg="$(date '+%F %T') [AUDIT] $1"
+    local msg
+    msg="$(date '+%F %T') [AUDIT] $1"
     echo "$msg" | tee -a "$AUDIT_LOG" >> "$RESTORE_DRILL_LOG"
 }
 
-# Log a CHECK result — records pass/fail for each individual verification step.
 check_pass() {
-    local description="$1"
     PASS_COUNT=$(( PASS_COUNT + 1 ))
-    log "  [PASS] ${description}"
+    log "  [PASS] $1"
 }
 
 check_fail() {
-    local description="$1"
     FAIL_COUNT=$(( FAIL_COUNT + 1 ))
-    log "  [FAIL] ${description}"
+    log "  [FAIL] $1"
 }
 
-# Fatal error — notify and exit 1.
 die() {
     log "FATAL: $*"
     notify_restore "FAILED: $*"
@@ -145,13 +143,11 @@ die() {
 }
 
 # =============================================================================
-# Locking
-# Uses a separate lock file from the backup script (/var/lock/ukwinika-backup.lock)
-# so a restore drill and a running backup never block each other.
+# Locking — separate lock file from the backup script
 # =============================================================================
 exec 200>"$LOCK_FILE"
 if ! flock -n 200; then
-    log "Another Restore Drill is Already Running. Exiting."
+    log "Another restore drill is already running. Exiting."
     exit 0
 fi
 
@@ -162,16 +158,14 @@ cleanup_lock() {
 trap cleanup_lock EXIT INT TERM
 
 # =============================================================================
-# Drill directory cleanup
-# Called on fatal errors. On normal exit, cleanup is handled explicitly at
-# the end of run_drill() based on pass/fail result and RESTORE_KEEP_ON_FAILURE.
+# Drill directory cleanup on fatal error
 # =============================================================================
 cleanup_on_exit() {
     if [[ -n "$DRILL_DIR" && -d "$DRILL_DIR" ]]; then
         if [[ "$RESTORE_KEEP_ON_FAILURE" == "yes" ]]; then
-            log "Drill Directory Preserved for Inspection: ${DRILL_DIR}"
+            log "Drill directory preserved for inspection: ${DRILL_DIR}"
         else
-            log "Removing Drill Directory: ${DRILL_DIR}"
+            log "Removing drill directory: ${DRILL_DIR}"
             rm -rf "$DRILL_DIR"
         fi
     fi
@@ -179,9 +173,6 @@ cleanup_on_exit() {
 
 # =============================================================================
 # Notifications
-# Uses the same SLACK_WEBHOOK and EMAIL_TO as the backup script.
-# Message format is distinct from backup notifications so they can be
-# filtered separately in Slack channels or email rules if needed.
 # =============================================================================
 notify_restore() {
     local status="$1"
@@ -200,18 +191,15 @@ notify_restore() {
             echo "Archive tested: ${DRILL_ARCHIVE:-unknown}"
             echo "Checks passed:  ${PASS_COUNT}"
             echo "Checks failed:  ${FAIL_COUNT}"
-            [[ -n "$DRILL_DIR" ]] && echo "Drill Directory: ${DRILL_DIR}"
+            [[ -n "$DRILL_DIR" ]] && echo "Drill directory: ${DRILL_DIR}"
             echo ""
-            echo "See ${RESTORE_DRILL_LOG} for the full Drill log."
+            echo "See ${RESTORE_DRILL_LOG} for the full drill log."
         } | mail -s "UKwinika Restore Drill ${status}" "$EMAIL_TO" || true
     fi
 }
 
 # =============================================================================
-# Prometheus metrics
-# Writes restore-specific metrics alongside the existing backup metrics.
-# The metrics file path is the same as the backup script's PROMETHEUS_FILE
-# so all UKwinika metrics are collected by a single textfile collector scrape.
+# Prometheus metrics — appended to existing PROMETHEUS_FILE
 # =============================================================================
 push_restore_metrics() {
     [[ "$METRICS_ENABLED" != "yes" ]] && return 0
@@ -221,8 +209,6 @@ push_restore_metrics() {
 
     mkdir -p "$(dirname "$PROMETHEUS_FILE")"
 
-    # Append restore metrics to the existing .prom file rather than overwriting
-    # it, so backup metrics written by the main script are preserved.
     cat >> "$PROMETHEUS_FILE" << EOF
 
 # HELP ukwinika_restore_test_last_run_seconds Unix timestamp of the last restore drill
@@ -239,16 +225,15 @@ ukwinika_restore_test_checks_passed ${PASS_COUNT}
 ukwinika_restore_test_checks_failed ${FAIL_COUNT}
 EOF
 
-    log "Prometheus Restore Metrics appended to ${PROMETHEUS_FILE}"
+    log "Prometheus restore metrics appended to ${PROMETHEUS_FILE}"
 }
 
 # =============================================================================
-# Repository existence check
-# Matches the lightweight test used by enhanced_automated_backups.sh exactly.
+# Repository existence check — matches backup script exactly
 # =============================================================================
 ensure_repo_exists() {
     if [[ ! -d "$BORG_REPO" ]] || [[ ! -f "${BORG_REPO}/config" ]]; then
-        log "ERROR: Borg Repository not found at ${BORG_REPO}."
+        log "ERROR: Borg repository not found at ${BORG_REPO}."
         echo "Initialise with: sudo enhanced_automated_backups.sh init" >&2
         return 1
     fi
@@ -257,23 +242,18 @@ ensure_repo_exists() {
 
 # =============================================================================
 # Pre-flight: full repository integrity check
-# A monthly drill warrants a full borg check — this is more thorough than
-# the lightweight existence test the backup script uses on every invocation.
 # =============================================================================
 preflight_repo_check() {
     log "Pre-flight: running full repository integrity check (borg check)..."
     if borg check "$BORG_REPO" 2>&1 | tee -a "$RESTORE_DRILL_LOG" | tee -a "$LOG_FILE"; then
         check_pass "Repository integrity check passed"
     else
-        # A corrupted repository is fatal — there is nothing to restore from.
-        die "Repository integrity check failed. Cannot proceed with Restore Drill."
+        die "Repository integrity check failed. Cannot proceed with restore drill."
     fi
 }
 
 # =============================================================================
 # Pre-flight: check available disk space
-# Estimates the size of the most recent archive and confirms the target
-# filesystem has sufficient free space before attempting extraction.
 # =============================================================================
 preflight_disk_space() {
     local archive="$1"
@@ -281,14 +261,12 @@ preflight_disk_space() {
 
     mkdir -p "$RESTORE_TARGET_BASE"
 
-    # Get the uncompressed size of the archive in bytes.
     local archive_size_bytes
     archive_size_bytes=$(borg info --json "${BORG_REPO}::${archive}" 2>/dev/null \
         | grep -o '"original_size": *[0-9]*' \
         | grep -o '[0-9]*' \
         | head -1 || echo "0")
 
-    # Get available space on the target filesystem in bytes.
     local available_bytes
     available_bytes=$(df --output=avail -B1 "$RESTORE_TARGET_BASE" 2>/dev/null \
         | tail -1 \
@@ -300,26 +278,22 @@ preflight_disk_space() {
     log "  Archive uncompressed size: ${archive_size_mb} MiB"
     log "  Available space:           ${available_mb} MiB on ${RESTORE_TARGET_BASE}"
 
-    # Require at least 110% of the archive size to account for filesystem overhead.
     local required_bytes=$(( archive_size_bytes + archive_size_bytes / 10 ))
 
     if (( available_bytes >= required_bytes )); then
-        check_pass "Sufficient Disk Space available (${available_mb} MiB free, ~${archive_size_mb} MiB needed)"
+        check_pass "Sufficient disk space available (${available_mb} MiB free, ~${archive_size_mb} MiB needed)"
     else
-        die "Insufficient Disk Space: ${available_mb} MiB available, at least ${archive_size_mb} MiB required."
+        die "Insufficient disk space: ${available_mb} MiB available, at least ${archive_size_mb} MiB required."
     fi
 }
 
 # =============================================================================
 # Resolve archive name
-# Returns the name of the most recent archive if no name was provided,
-# or validates and returns the explicitly provided archive name.
 # =============================================================================
 resolve_archive() {
     local requested="$1"
 
     if [[ -n "$requested" ]]; then
-        # Validate the requested archive actually exists.
         if borg list --short "$BORG_REPO" | grep -qxF "$requested"; then
             echo "$requested"
             return 0
@@ -328,7 +302,6 @@ resolve_archive() {
         fi
     fi
 
-    # Auto-select the most recent archive.
     local latest
     latest=$(borg list --short --last 1 "$BORG_REPO" 2>/dev/null || true)
 
@@ -341,6 +314,8 @@ resolve_archive() {
 
 # =============================================================================
 # Extract archive to drill directory
+# Uses (cd target && borg extract) for borg 1.2.x compatibility.
+# The --target flag was introduced in BorgBackup 1.4.
 # =============================================================================
 extract_archive() {
     local archive="$1"
@@ -349,7 +324,7 @@ extract_archive() {
     log "Extracting archive '${archive}' to '${target}'..."
     mkdir -p "$target"
 
-    if borg extract "${BORG_REPO}::${archive}" --target "$target" \
+    if ( cd "$target" && borg extract "${BORG_REPO}::${archive}" ) \
             2>&1 | tee -a "$RESTORE_DRILL_LOG" | tee -a "$LOG_FILE"; then
         check_pass "Archive extraction completed without errors"
     else
@@ -358,27 +333,23 @@ extract_archive() {
 }
 
 # =============================================================================
-# Verification suite
-# Each check is independent — a failed check is recorded and counted but does
-# not abort the suite, so the full picture is captured in a single drill run.
+# Verification suite — six independent checks
 # =============================================================================
 
-# Check 1: Extraction directory is non-empty
 verify_non_empty() {
     local target="$1"
-    log "Verification 1/6: Checking that Restore Directory is non-empty..."
+    log "Verification 1/6: Checking that restore directory is non-empty..."
 
     local entry_count
-    entry_count=$(find "$target" -mindepth 1 -maxdepth 2 | wc -l)
+    entry_count=$(find "$target" -mindepth 1 | wc -l)
 
     if (( entry_count > 0 )); then
-        check_pass "Restore Directory is non-empty (${entry_count} top-level entries found)"
+        check_pass "Restore directory is non-empty (${entry_count} top-level entries found)"
     else
-        check_fail "Restore Directory is empty — extraction may have produced no output"
+        check_fail "Restore directory is empty — extraction may have produced no output"
     fi
 }
 
-# Check 2: Mandatory paths exist
 verify_mandatory_paths() {
     local target="$1"
     log "Verification 2/6: Checking mandatory paths (${RESTORE_VERIFY_PATHS})..."
@@ -401,7 +372,6 @@ verify_mandatory_paths() {
     fi
 }
 
-# Check 3: Minimum file count
 verify_file_count() {
     local target="$1"
     log "Verification 3/6: Counting restored files (minimum: ${RESTORE_MIN_FILES})..."
@@ -417,9 +387,6 @@ verify_file_count() {
     fi
 }
 
-# Check 4: SHA256 checksum spot-check against the backup audit log
-# Compares checksums of key files in the restore against what the backup
-# script recorded in AUDIT_LOG at the time the archive was created.
 verify_checksums() {
     local target="$1"
     log "Verification 4/6: SHA256 spot-check against audit log (${AUDIT_LOG})..."
@@ -433,26 +400,20 @@ verify_checksums() {
     local checked=0
     local mismatched=0
 
-    # Check each mandatory path that is a regular file.
     for rel_path in $RESTORE_VERIFY_PATHS; do
         local full_path="${target}/${rel_path}"
         [[ ! -f "$full_path" ]] && continue
 
-        # Compute the checksum of the restored file.
         local restored_sum
         restored_sum=$(sha256sum "$full_path" | awk '{print $1}')
 
-        # Look for the original checksum in the audit log.
-        # The audit log records the Borg repository object checksums, not the
-        # filesystem file checksums directly. We match on the relative path
-        # suffix of the original path.
         local audit_sum
         audit_sum=$(grep "${rel_path}$" "$AUDIT_LOG" 2>/dev/null \
             | tail -1 \
             | awk '{print $1}' || true)
 
         if [[ -z "$audit_sum" ]]; then
-            log "  SKIP  ${rel_path} — no audit log entry found; path may not have changed since last full audit"
+            log "  SKIP  ${rel_path} — no audit log entry found"
             continue
         fi
 
@@ -470,21 +431,19 @@ verify_checksums() {
     if (( mismatched == 0 && checked > 0 )); then
         check_pass "Checksum verification passed for ${checked} file(s)"
     elif (( mismatched == 0 && checked == 0 )); then
-        log "  NOTE: No checksum matches possible against current audit log. Consider running a fresh backup."
         check_pass "Checksum verification skipped — no comparable audit entries available"
     else
         check_fail "Checksum mismatch detected in ${mismatched} file(s) — data integrity concern"
     fi
 }
 
-# Check 5: No zero-byte files in critical paths
-# Zero-byte files in paths like /etc suggest a corrupted or incomplete archive.
 verify_no_zero_byte_files() {
     local target="$1"
     log "Verification 5/6: Checking for unexpected zero-byte files in critical paths..."
 
-    # Only check paths that are expected to have content.
-    local critical_dirs=("${target}/etc" "${target}/usr" "${target}/bin")
+    # /etc is excluded — zero-byte placeholder and lock files in /etc are normal
+    # and would produce false positives. Only /usr and /bin are checked.
+    local critical_dirs=("${target}/usr" "${target}/bin")
     local zero_count=0
 
     for dir in "${critical_dirs[@]}"; do
@@ -492,7 +451,7 @@ verify_no_zero_byte_files() {
         local count
         count=$(find "$dir" -maxdepth 2 -type f -size 0 | wc -l)
         if (( count > 0 )); then
-            log "  ${count} zero-byte file(s) found under ${dir##*/target/}"
+            log "  ${count} zero-byte file(s) found under ${dir##*/}"
             zero_count=$(( zero_count + count ))
         fi
     done
@@ -504,8 +463,6 @@ verify_no_zero_byte_files() {
     fi
 }
 
-# Check 6: Archive info sanity — confirm the archive metadata is readable
-# and that the archive hostname matches the current or expected hostname.
 verify_archive_metadata() {
     local archive="$1"
     log "Verification 6/6: Verifying archive metadata..."
@@ -533,9 +490,7 @@ verify_archive_metadata() {
 }
 
 # =============================================================================
-# Write drill result to audit log
-# Records a structured entry in AUDIT_LOG consistent with the format used
-# by the audit() helper in enhanced_automated_backups.sh.
+# Write structured drill result to audit log
 # =============================================================================
 write_audit_entry() {
     local result="$1"
@@ -544,23 +499,21 @@ write_audit_entry() {
 
 # =============================================================================
 # Cleanup after drill
-# On PASS: always remove the drill directory (it served its purpose).
-# On FAIL: behaviour is controlled by RESTORE_KEEP_ON_FAILURE.
 # =============================================================================
 cleanup_drill_dir() {
-    local result="$1"   # PASS or FAIL
+    local result="$1"
 
     if [[ ! -d "$DRILL_DIR" ]]; then
         return 0
     fi
 
     if [[ "$result" == "PASS" ]]; then
-        log "Removing Drill Directory (drill passed): ${DRILL_DIR}"
+        log "Removing drill directory (drill passed): ${DRILL_DIR}"
         rm -rf "$DRILL_DIR"
     elif [[ "$RESTORE_KEEP_ON_FAILURE" == "yes" ]]; then
-        log "Drill Directory preserved for inspection (RESTORE_KEEP_ON_FAILURE=yes): ${DRILL_DIR}"
+        log "Drill directory preserved for inspection (RESTORE_KEEP_ON_FAILURE=yes): ${DRILL_DIR}"
     else
-        log "Removing Drill Directory (RESTORE_KEEP_ON_FAILURE=no): ${DRILL_DIR}"
+        log "Removing drill directory (RESTORE_KEEP_ON_FAILURE=no): ${DRILL_DIR}"
         rm -rf "$DRILL_DIR"
     fi
 }
@@ -577,7 +530,6 @@ run_drill() {
     log "=== UKwinika Automated Restore Drill starting (v${SCRIPT_VERSION}) ==="
     log "================================================================"
 
-    # ---- Pre-flight --------------------------------------------------------
     ensure_repo_exists || die "Repository missing or invalid"
 
     DRILL_ARCHIVE=$(resolve_archive "$requested_archive")
@@ -586,25 +538,22 @@ run_drill() {
     preflight_repo_check
     preflight_disk_space "$DRILL_ARCHIVE"
 
-    # ---- Extraction --------------------------------------------------------
     DRILL_DIR="${RESTORE_TARGET_BASE}/${DRILL_TIMESTAMP}_${DRILL_ARCHIVE}"
-    log "Drill Directory: ${DRILL_DIR}"
+    log "Drill directory: ${DRILL_DIR}"
 
     extract_archive "$DRILL_ARCHIVE" "$DRILL_DIR"
 
-    # ---- Verification suite ------------------------------------------------
     log "--- Running verification suite ---"
-    verify_non_empty         "$DRILL_DIR"
-    verify_mandatory_paths   "$DRILL_DIR"
-    verify_file_count        "$DRILL_DIR"
-    verify_checksums         "$DRILL_DIR"
+    verify_non_empty          "$DRILL_DIR"
+    verify_mandatory_paths    "$DRILL_DIR"
+    verify_file_count         "$DRILL_DIR"
+    verify_checksums          "$DRILL_DIR"
     verify_no_zero_byte_files "$DRILL_DIR"
-    verify_archive_metadata  "$DRILL_ARCHIVE"
+    verify_archive_metadata   "$DRILL_ARCHIVE"
 
-    # ---- Results -----------------------------------------------------------
-    log "--- Verification Complete ---"
-    log "Checks Passed: ${PASS_COUNT}"
-    log "Checks Failed: ${FAIL_COUNT}"
+    log "--- Verification complete ---"
+    log "Checks passed: ${PASS_COUNT}"
+    log "Checks failed: ${FAIL_COUNT}"
 
     local overall_result
     if (( FAIL_COUNT == 0 )); then
@@ -613,14 +562,14 @@ run_drill() {
         overall_result="FAIL"
     fi
 
-    log "Overall Result: ${overall_result}"
+    log "Overall result: ${overall_result}"
 
     write_audit_entry "$overall_result"
     push_restore_metrics
     cleanup_drill_dir "$overall_result"
 
     log "================================================================"
-    log "=== UKwinika Automated Restore Drill Complete: ${overall_result} ==="
+    log "=== UKwinika Automated Restore Drill complete: ${overall_result} ==="
     log "================================================================"
 
     if [[ "$overall_result" == "PASS" ]]; then
@@ -633,7 +582,7 @@ run_drill() {
 }
 
 # =============================================================================
-# List archives (convenience wrapper)
+# List archives
 # =============================================================================
 list_archives() {
     ensure_repo_exists || die "Repository missing or invalid"
@@ -646,7 +595,7 @@ list_archives() {
 # =============================================================================
 clean_drill_dirs() {
     if [[ ! -d "$RESTORE_TARGET_BASE" ]]; then
-        echo "No Drill Directories found at ${RESTORE_TARGET_BASE}."
+        echo "No drill directories found at ${RESTORE_TARGET_BASE}."
         return 0
     fi
 
@@ -654,13 +603,13 @@ clean_drill_dirs() {
     count=$(find "$RESTORE_TARGET_BASE" -mindepth 1 -maxdepth 1 -type d | wc -l)
 
     if (( count == 0 )); then
-        echo "No Drill Directories to remove under ${RESTORE_TARGET_BASE}."
+        echo "No drill directories to remove under ${RESTORE_TARGET_BASE}."
         return 0
     fi
 
-    log "Removing ${count} Drill Director(y/ies) under ${RESTORE_TARGET_BASE}..."
+    log "Removing ${count} drill director(y/ies) under ${RESTORE_TARGET_BASE}..."
     find "$RESTORE_TARGET_BASE" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
-    log "Clean Complete."
+    log "Clean complete."
 }
 
 # =============================================================================
@@ -668,7 +617,6 @@ clean_drill_dirs() {
 # =============================================================================
 case "${1:-test}" in
     test)
-        # Optional second argument: specific archive name.
         run_drill "${2:-}"
         ;;
     list)
@@ -680,9 +628,9 @@ case "${1:-test}" in
     *)
         echo "Usage: $0 {test [archive_name]|list|clean}"
         echo ""
-        echo "  test [archive_name]   Run Restore Drill against most recent or named archive"
+        echo "  test [archive_name]   Run restore drill against most recent or named archive"
         echo "  list                  List all available archives"
-        echo "  clean                 Remove all Drill Directories under RESTORE_TARGET_BASE"
+        echo "  clean                 Remove all drill directories under RESTORE_TARGET_BASE"
         exit 1
         ;;
 esac
