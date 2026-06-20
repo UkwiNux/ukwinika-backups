@@ -1,4 +1,4 @@
-# UKwinika Daily Backup Service – v3.2
+# UKwinika Daily Backup Service – v3.2.1
 # Installed by: sudo make systemd
 # Triggered by: ukwinika-backup.timer (daily at 02:00 ± 30 min)
 # Run manually:  sudo systemctl start ukwinika-backup.service
