@@ -2,10 +2,10 @@
 # =============================================================================
 # UKwinika Enhanced Automated Backup Script – Smart Idempotent Edition
 # Author: Urayayi Kwinika
-# Version: 3.2
+# Version: 3.2.1
 # Description:
 #   - Fully idempotent 3‑2‑1 backup (Borg → USB → Cloud)
-#   - Safe Restore with dedicated target directory
+#   - Safe restore with dedicated target directory
 #   - Stale‑lock prevention via cleanup trap
 #   - Secrets separated from configuration
 #   - Strict DB type validation
@@ -13,6 +13,7 @@
 #   - Repository lightweight existence check (no full integrity scan on every run)
 #   - Real-time monitoring uses a child process to avoid lock re-acquisition
 #   - Failure notifications alongside success notifications
+#   - borg extract uses cd subshell for borg 1.2.x compatibility (no --target flag)
 # Usage:
 #   backup                      Run full backup cycle
 #   restore <archive> [target]  Restore archive to target (default /tmp/restore_<archive>)
@@ -52,7 +53,6 @@ export BORG_PASSPHRASE
 BORG_REPO="${BORG_REPO:-/UKwinikaBackup/borg-repo}"
 
 # Default arrays – declared only if the config did not set them.
-# NOTE: configs must use proper bash array syntax, e.g.: BACKUP_PATHS=("/")
 if [[ -z "${BACKUP_PATHS+x}" ]]; then
     BACKUP_PATHS=("/")
 fi
@@ -82,7 +82,7 @@ DB_DUMP_DIR="${DB_DUMP_DIR:-/tmp/ukwinika-db-dump}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-/tmp/ukwinika-backup-checksums.txt}"
 
 # =============================================================================
-# Logging Helpers
+# Logging helpers
 # =============================================================================
 log()   { echo "$(date '+%F %T') $SCRIPT_NAME: $*" | tee -a "$LOG_FILE"; }
 audit() {
@@ -106,7 +106,7 @@ cleanup_lock() {
 trap cleanup_lock EXIT INT TERM
 
 # =============================================================================
-# Hook Runner
+# Hook runner
 # =============================================================================
 run_hook() {
     local hook="$1"
@@ -164,7 +164,7 @@ db_dump() {
 }
 
 # =============================================================================
-# Borg Archive Creation + Pruning
+# Borg archive creation + pruning
 # =============================================================================
 borg_backup() {
     local dump_path="$1"
@@ -172,13 +172,11 @@ borg_backup() {
     timestamp=$(date '+%Y-%m-%d_%H:%M:%S')
     local archive_name="${HOSTNAME:-$(hostname)}-${timestamp}"
 
-    # Build --exclude arguments from the EXCLUDE_DIRS array
     local exclude_args=()
     for dir in "${EXCLUDE_DIRS[@]}"; do
         exclude_args+=(--exclude "$dir")
     done
 
-    # Optionally include the DB dump directory
     local extra_paths=()
     [[ -n "$dump_path" ]] && extra_paths+=("$dump_path")
 
@@ -197,8 +195,6 @@ borg_backup() {
         "${extra_paths[@]}"  \
         || die "borg create failed"
 
-    # Prune: keep-within and keep-last are complementary; keep-daily alone is
-    # not needed when keep-within already covers the same timespan.
     log "Pruning old archives (keep-within ${RETENTION_DAYS}d, keep-last ${RETENTION_VERSIONS})..."
     borg prune               \
         --list               \
@@ -210,7 +206,7 @@ borg_backup() {
 }
 
 # =============================================================================
-# USB Secondary Copy
+# USB secondary copy
 # =============================================================================
 sync_to_usb() {
     if [[ -z "$USB_RSYNC_TARGET" ]]; then
@@ -234,7 +230,7 @@ sync_to_usb() {
 }
 
 # =============================================================================
-# Cloud Tertiary Copy
+# Cloud tertiary copy
 # =============================================================================
 cloud_upload() {
     if [[ -z "$CLOUD_REMOTE" ]]; then
@@ -253,7 +249,7 @@ cloud_upload() {
 }
 
 # =============================================================================
-# Audit – SHA256 Checksums of All Repository Objects
+# Audit – SHA256 checksums of all repository objects
 # =============================================================================
 audit_checksum() {
     log "Generating SHA256 checksums of repository..."
@@ -262,7 +258,7 @@ audit_checksum() {
 }
 
 # =============================================================================
-# Prometheus Metrics
+# Prometheus metrics
 # =============================================================================
 push_metrics() {
     [[ "$METRICS_ENABLED" != "yes" ]] && return 0
@@ -303,9 +299,7 @@ notify() {
 }
 
 # =============================================================================
-# Real-Time Monitoring
-# Spawns backup as a child process so it does not attempt to re-acquire the
-# parent's flock file descriptor.
+# Real-time monitoring
 # =============================================================================
 real_time_mode() {
     log "Starting real-time monitoring (inotify) on: ${REAL_TIME_DIRS[*]}"
@@ -316,29 +310,30 @@ real_time_mode() {
         inotifywait -r -e modify,create,delete \
             "${REAL_TIME_DIRS[@]}" 2>/dev/null || true
         log "Change detected – triggering backup in child process."
-        # Release the lock for the child so it can acquire it normally
         flock -u 200 2>/dev/null || true
         "$0" backup
-        # Re-acquire the lock to protect the monitoring loop itself
         flock -n 200 || true
     done
 }
 
 # =============================================================================
 # Restore
+# Uses a cd subshell instead of --target for compatibility with borg 1.2.x.
+# The --target flag was introduced in BorgBackup 1.4 and is not available on
+# distributions shipping borg 1.2.x (Debian 12, Ubuntu 22.04/24.04, RHEL 9).
 # =============================================================================
 restore_backup() {
     local archive="$1"
     local target="${2:-/tmp/restore_${archive}}"
     log "Restoring archive '${archive}' to '${target}'..."
     mkdir -p "$target"
-    borg extract "${BORG_REPO}::${archive}" --target "$target" \
+    ( cd "$target" && borg extract "${BORG_REPO}::${archive}" ) \
         || die "borg extract failed"
     log "Restore completed successfully to ${target}"
 }
 
 # =============================================================================
-# Convenience Wrappers
+# Convenience wrappers
 # =============================================================================
 list_archives() {
     borg list "$BORG_REPO" || die "Cannot list archives"
@@ -350,9 +345,6 @@ check_repo() {
 
 # =============================================================================
 # Repository existence check
-# Uses a lightweight stat-based test rather than a full borg check so that
-# every invocation (list, backup, etc.) is fast.  The full integrity check
-# is available via the dedicated `check` subcommand.
 # =============================================================================
 ensure_repo_exists() {
     if [[ ! -d "$BORG_REPO" ]] || [[ ! -f "${BORG_REPO}/config" ]]; then
@@ -364,7 +356,7 @@ ensure_repo_exists() {
 }
 
 # =============================================================================
-# Full Backup Cycle
+# Full backup cycle
 # =============================================================================
 run_backup() {
     log "=== Starting UKwinika Enhanced Backup ==="
@@ -382,7 +374,7 @@ run_backup() {
 }
 
 # =============================================================================
-# CLI Dispatch
+# CLI dispatch
 # =============================================================================
 case "${1:-}" in
     backup)
