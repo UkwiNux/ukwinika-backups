@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Pre-Backup Hook – v3.2
+# UKwinika Pre-Backup Hook – v3.2.1
 # Place at the path set in PRE_HOOK inside ukwinika-backup.conf and make
 # it executable:
 #   sudo chmod +x /etc/ukwinika/pre_backup_hook.sh
