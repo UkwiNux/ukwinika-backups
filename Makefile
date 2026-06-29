@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Project Makefile – v3.2.1 (Idempotent Edition)
+# UKwinika Backup Project Makefile – v3.2.2 (Idempotent Edition)
 # Author: Urayayi Kwinika
 # Description: Handles installation, dependencies, and systemd deployment.
 # Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS systems.

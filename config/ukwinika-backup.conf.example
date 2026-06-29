@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Configuration Example – v3.2.1 Idempotent Edition
+# UKwinika Backup Configuration Example – v3.2.2 Idempotent Edition
 # Copy to /etc/ukwinika-backup.conf and adjust.
 # STRICTLY no secrets in this file — all credentials go in ukwinika-backup.secrets.
 # Permissions: sudo chmod 600 /etc/ukwinika-backup.conf
@@ -27,6 +27,7 @@ EXCLUDE_DIRS=(
     "/var/cache"
     "/var/tmp"
     "/home/*/.cache"
+    "/UKwinikaBackup"
 )
 
 # ---------- Retention Policy ------------------------------------------------
@@ -61,7 +62,13 @@ HOOK_FAIL_ACTION="fatal"
 
 # ---------- Real-Time Monitoring Directories --------------------------------
 # Bash array of directories watched by inotifywait in real-time mode.
+# When real-time mode triggers a backup, ONLY these paths are archived
+# (not the full BACKUP_PATHS set) to avoid full-root backup storms.
 REAL_TIME_DIRS=("/etc" "/home")
+
+# Seconds to wait after the last detected change before starting a real-time
+# backup. Additional changes within this window extend the wait.
+REAL_TIME_DEBOUNCE_SEC=60
 
 # ---------- Notifications (Non-Secret Recipients) ---------------------------
 # EMAIL_TO can also be placed in the secrets file if the address is sensitive.

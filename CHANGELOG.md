@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v3.2.2] – 2026-06-29
+
+### Fixed
+- **Borg self-inclusion** — `BORG_REPO` is auto-excluded at runtime if missing from `EXCLUDE_DIRS`; `/UKwinikaBackup` added to the default exclude list in `ukwinika-backup.conf.example`.
+- **Restore drill checksum verification** — backup now records SHA256 hashes of `RESTORE_VERIFY_PATHS` into the audit log; the restore drill fails if no matching entries exist.
+- **Real-time backup storms** — real-time triggers now back up only `REAL_TIME_DIRS` (not full `BACKUP_PATHS`) with configurable debounce (`REAL_TIME_DEBOUNCE_SEC`, default 60s).
+- **USB rsync safety** — validates mount point, rejects same-device-as-root mounts, and requires `USB_RSYNC_TARGET` to be inside `USB_MOUNT` before `rsync --delete`.
+- **Prometheus metrics** — backup and restore scripts atomically rewrite a single metrics file (no duplicate blocks from append).
+- **Config file permissions** — both scripts refuse to run if config/secrets files are not mode `600`/`400` and root-owned (skip with `UKW_SKIP_CONFIG_SECURITY=1` for CI).
+- **Passphrase exposure** — `BORG_PASSPHRASE` is no longer exported globally; passed only to Borg via `run_borg()`.
+
+### Changed
+- **`ukwinika-realtime-backup.service`** — aligned systemd hardening with the daily backup unit (`ProtectSystem=strict`, `PrivateTmp`, `NoNewPrivileges`, etc.).
+- **`ukwinika_automated_restore.sh`** bumped to v1.1.
+
+---
+
 ## [v3.2.1] – 2026-06-18
 
 ### Added

@@ -71,6 +71,7 @@ CONFEOF
           export UKW_CONFIG="$CONFIG"
           export UKW_SECRETS="$SECRETS"
           export BORG_PASSPHRASE="ci-test-passphrase"
+          export UKW_SKIP_CONFIG_SECURITY=1
 
           # Initialise repository
           borg init --encryption=repokey "${REPO}/borg-repo"
@@ -98,7 +99,7 @@ CONFEOF
           for var in BORG_REPO BACKUP_PATHS EXCLUDE_DIRS RETENTION_DAYS \
                      RETENTION_VERSIONS USB_MOUNT USB_RSYNC_TARGET CLOUD_REMOTE \
                      DB_TYPE DB_DUMP_DIR PRE_HOOK POST_HOOK HOOK_FAIL_ACTION \
-                     REAL_TIME_DIRS EMAIL_TO METRICS_ENABLED PROMETHEUS_FILE \
+                     REAL_TIME_DIRS REAL_TIME_DEBOUNCE_SEC EMAIL_TO METRICS_ENABLED PROMETHEUS_FILE \
                      CHECKSUM_FILE RESTORE_TARGET_BASE RESTORE_VERIFY_PATHS \
                      RESTORE_MIN_FILES RESTORE_KEEP_ON_FAILURE RESTORE_DRILL_LOG; do
             grep -q "^${var}=" config/ukwinika-backup.conf.example \

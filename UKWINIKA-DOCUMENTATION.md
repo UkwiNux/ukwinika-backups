@@ -1,6 +1,6 @@
 # UKwinika Enhanced Automated Backup Script (EABS)
 
-**Version:** 3.2.1
+**Version:** 3.2.2
 **Author:** Urayayi Kwinika
 **License:** MIT
 **Date:** June 2026
@@ -10,7 +10,7 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [What's New in 3.2.1](#2-whats-new-in-321)
+2. [What's New in 3.2.2](#2-whats-new-in-322)
 3. [Key Features](#3-key-features)
 4. [The 3-2-1 Backup Principle](#4-the-3-2-1-backup-principle)
 5. [Repository Structure](#5-repository-structure)
@@ -51,7 +51,18 @@ The backup script is designed to be **fully idempotent** — it can be run any n
 
 ---
 
-## 2. What's New in 3.2.1
+## 2. What's New in 3.2.2
+
+- **Borg self-inclusion prevented** — `BORG_REPO` auto-excluded at runtime; `/UKwinikaBackup` in default `EXCLUDE_DIRS`.
+- **Restore checksum verification fixed** — backup records SHA256 of `RESTORE_VERIFY_PATHS` files in the audit log.
+- **Real-time scoped backups** — inotify triggers backup only `REAL_TIME_DIRS` with debounce (`REAL_TIME_DEBOUNCE_SEC`).
+- **USB rsync guards** — mount validation, same-device-as-root rejection, target path checks before `--delete`.
+- **Unified Prometheus writes** — single atomic metrics file (no append duplication).
+- **Config permission enforcement** — root-owned mode `600`/`400` required (skip in CI with `UKW_SKIP_CONFIG_SECURITY=1`).
+- **Passphrase scoping** — `BORG_PASSPHRASE` passed via `run_borg()` only, not exported globally.
+- **Real-time systemd hardening** — aligned with daily backup service.
+
+## 2.1 What's New in 3.2.1
 
 - **`backuprestore/` folder** — the automated restore drill and its two systemd units now live in a dedicated folder, keeping restore-specific files separate from the backup systemd units in `systemd/`.
 - **`ukwinika_automated_restore.sh` (v1.0)** — new script that automates the full restore verification workflow: full repository integrity check, disk space pre-flight, archive extraction, six independent verification checks, audit log entry, Prometheus metrics, and Slack/email notification. Exit code 0 = PASS, exit code 1 = FAIL.
@@ -68,7 +79,7 @@ The backup script is designed to be **fully idempotent** — it can be run any n
 - **3-2-1 backup** — primary on disk (Borg), secondary on removable USB (rsync mirror), tertiary to cloud (rclone).
 - **BorgBackup** — deduplication, lz4 compression, AES-256 `repokey` encryption, mountable archives.
 - **Multiple backup subcommands** — `backup`, `restore`, `list`, `check`, `real-time`, `init`.
-- **Real-time monitoring** — inotify triggers a full backup on file change, spawning a child process to avoid lock contention.
+- **Real-time monitoring** — inotify triggers scoped backups of `REAL_TIME_DIRS` only (with debounce), spawning a child process to avoid lock contention.
 - **Database-aware** — adaptive dumps for MySQL, PostgreSQL, and MongoDB before each backup; unknown `DB_TYPE` values abort immediately.
 - **Pre/post hooks** — custom executable scripts before and after the backup, with configurable failure behaviour.
 - **Automated restore drill** — `ukwinika_automated_restore.sh` runs six checks against the most recent archive and reports pass/fail results without human interaction.
@@ -273,11 +284,13 @@ All sensitive values live in `/etc/ukwinika-backup.secrets` (mode `0600`, overri
 
 1. Load `$UKW_CONFIG` (abort if missing).
 2. Load `$UKW_SECRETS` (skip if file absent, but `BORG_PASSPHRASE` must be set).
-3. Export `BORG_PASSPHRASE` to the environment.
-4. Apply defaults for unset variables.
-5. Acquire exclusive `flock` on `/var/lock/ukwinika-backup.lock`; exit cleanly if already locked.
-6. Register `trap cleanup_lock EXIT INT TERM`.
-7. Dispatch to the requested subcommand.
+3. Pass `BORG_PASSPHRASE` to Borg subprocesses via `run_borg()` (not exported globally).
+4. Validate config/secrets permissions (mode `600`/`400`, root-owned).
+5. Auto-exclude `BORG_REPO` from backup paths if not already in `EXCLUDE_DIRS`.
+6. Apply defaults for unset variables.
+7. Acquire exclusive `flock` on `/var/lock/ukwinika-backup.lock`; exit cleanly if already locked.
+8. Register `trap cleanup_lock EXIT INT TERM`.
+9. Dispatch to the requested subcommand.
 
 ### `backup` call chain
 
@@ -288,6 +301,7 @@ pre-hook
   └─ borg prune          → enforces retention policy
   └─ sync_to_usb()       → rsync -a --delete → USB
   └─ cloud_upload()      → rclone copy → cloud
+  └─ audit_verify_path_checksums() → SHA256 of RESTORE_VERIFY_PATHS → AUDIT_LOG
   └─ audit_checksum()    → SHA256 of all repo files → $CHECKSUM_FILE + AUDIT_LOG
   └─ push_metrics()      → $PROMETHEUS_FILE
   └─ notify "SUCCESS"    → Slack + email
@@ -351,7 +365,7 @@ Hooks must be executable files. Failure behaviour is controlled by `HOOK_FAIL_AC
 
 ## 14. Real-Time Monitoring
 
-The `real-time` subcommand uses `inotifywait` to watch `REAL_TIME_DIRS`. On any file modification, creation, or deletion it triggers a full `backup` cycle in a child process.
+The `real-time` subcommand uses `inotifywait` to watch `REAL_TIME_DIRS`. After a debounce period (`REAL_TIME_DEBOUNCE_SEC`, default 60s), it triggers a **scoped** backup of only those directories (not full `BACKUP_PATHS`) in a child process.
 
 **Lock safety:** the monitoring loop releases its `flock` before spawning the child, then re-acquires it after the child exits. This prevents the deadlock that would occur if the child tried to acquire the lock already held by the parent.
 
@@ -371,7 +385,7 @@ sudo enhanced_automated_backups.sh restore <archive_name>
 sudo enhanced_automated_backups.sh restore <archive_name> /mnt/restore-test
 ```
 
-The extraction uses `borg extract --target`, making it idempotent — running the same command again produces the same result.
+The extraction uses `(cd target && borg extract)` for Borg 1.2.x compatibility — running the same command again produces the same result.
 
 ### Manual drill checklist
 
@@ -398,7 +412,7 @@ extract_archive()            → borg extract --target $RESTORE_TARGET_BASE/<tim
   └─ verify_no_zero_byte_files()       Check 5: no zero-byte files in /etc, /usr, /bin
   └─ verify_archive_metadata()         Check 6: borg info returns hostname + creation time
 write_audit_entry()          → structured PASS/FAIL entry in AUDIT_LOG
-push_restore_metrics()       → appends 4 metrics to PROMETHEUS_FILE
+push_restore_metrics()       → atomic rewrite of PROMETHEUS_FILE (backup + restore sections)
 cleanup_drill_dir()          → remove on PASS; keep on FAIL if RESTORE_KEEP_ON_FAILURE=yes
 notify_restore()             → "Restore Drill PASSED/FAILED on <hostname>"
 ```
@@ -459,14 +473,14 @@ Each script uses `flock -n` and a `trap cleanup_lock EXIT INT TERM` to release a
 | DB dump | Dump directory wiped and recreated on every run |
 | Restore | `borg extract --target` overwrites the target consistently |
 | `init` | Checks for existing valid repository before creating |
-| Prometheus metrics | `.prom` file overwritten (backup) / appended then overwritten (restore) on each run |
+| Prometheus metrics | `.prom` file atomically rewritten with backup and restore sections on each run |
 | Restore drill | Drill directory name includes timestamp; each run creates a fresh directory |
 
 ---
 
 ## 18. Prometheus Metrics
 
-When `METRICS_ENABLED=yes`, both scripts write to `PROMETHEUS_FILE`. The restore script appends its four metrics to the file so a single Node Exporter textfile collector scrape covers all six metrics.
+When `METRICS_ENABLED=yes`, both scripts atomically rewrite `PROMETHEUS_FILE` with all six metrics so Node Exporter always sees a consistent file.
 
 ```
 --collector.textfile.directory=/var/lib/prometheus/node_exporter/custom
@@ -493,7 +507,7 @@ When `METRICS_ENABLED=yes`, both scripts write to `PROMETHEUS_FILE`. The restore
 | File | Written by | Content | Rotation |
 |---|---|---|---|
 | `/var/log/UKwinikaBackup.log` | Both scripts | Timestamped INFO and FATAL messages | Daily, 14 rotations |
-| `/var/log/UKwinikaBackup_audit.log` | Both scripts | Structured audit entries; SHA256 checksums after backup; drill PASS/FAIL entries | Daily, 14 rotations |
+| `/var/log/UKwinikaBackup_audit.log` | Both scripts | Structured audit entries; SHA256 of `RESTORE_VERIFY_PATHS` at backup time; repo checksum file reference; drill PASS/FAIL entries | Daily, 14 rotations |
 | `/var/log/UKwinikaRestore.log` | Restore script only | Full restore drill output (also tee'd to UKwinikaBackup.log) | Daily, 14 rotations |
 
 Both scripts use the same `log()` format so all events appear in a single chronological timeline in `/var/log/UKwinikaBackup.log`.
@@ -523,7 +537,9 @@ The restore drill failure email also includes the check counts and the drill dir
 
 ## 21. Security Considerations
 
-- `BORG_PASSPHRASE` and webhook URLs are stored exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`). No secret ever appears in a log message or in the process argument list.
+- `BORG_PASSPHRASE` and webhook URLs are stored exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`). The passphrase is passed to Borg subprocesses only via `run_borg()`.
+- Config and secrets files must be mode `600` or `400` and owned by root; both scripts enforce this at startup (`UKW_SKIP_CONFIG_SECURITY=1` for CI/dev only).
+- Always exclude the Borg repository from backup paths (`/UKwinikaBackup` in default excludes; auto-excluded at runtime).
 - Borg uses `repokey` encryption (AES-256). **Never lose the passphrase or repository key.** Export with `borg key export` and store separately.
 - Both scripts use `flock` and `set -euo pipefail`. Separate lock files mean neither blocks the other.
 - Restrict both scripts: `chmod 700 /usr/local/bin/enhanced_automated_backups.sh /usr/local/bin/ukwinika_automated_restore.sh`.
@@ -543,7 +559,7 @@ Five units are provided across two directories:
 
 **`ukwinika-backup.timer`** — fires daily at 02:00 ± 30 min. `Persistent=true` catches missed runs.
 
-**`ukwinika-realtime-backup.service`** — simple service. Runs `real-time`. Restarts on failure; stops after three rapid failures (`StartLimitBurst=3`, `StartLimitIntervalSec=60`).
+**`ukwinika-realtime-backup.service`** — simple service. Runs `real-time`. Same hardening as backup service (`ProtectSystem=strict`, `PrivateTmp`, `NoNewPrivileges`). Restarts on failure; stops after three rapid failures (`StartLimitBurst=3`, `StartLimitIntervalSec=60`).
 
 ### Restore drill units (`backuprestore/`)
 
@@ -647,6 +663,15 @@ Installed to `/etc/logrotate.d/ukwinika-backup` by `sudo make systemd`.
 ---
 
 ## 26. Upgrade Notes
+
+### From 3.2.1 to 3.2.2
+
+1. Replace `enhanced_automated_backups.sh` and `backuprestore/ukwinika_automated_restore.sh` with the v3.2.2 versions.
+2. Run `sudo make install && sudo make systemd` to redeploy scripts and the updated `ukwinika-realtime-backup.service`.
+3. Add `/UKwinikaBackup` to `EXCLUDE_DIRS` in `/etc/ukwinika-backup.conf` if not already present (auto-excluded at runtime regardless).
+4. Optionally set `REAL_TIME_DEBOUNCE_SEC=60` (default) in config.
+5. Ensure `/etc/ukwinika-backup.conf` and `/etc/ukwinika-backup.secrets` are mode `600` and owned by root.
+6. No passphrase or repository changes required.
 
 ### From 3.2 to 3.2.1
 

@@ -2,7 +2,7 @@
 
 **A 3‑2‑1 Backup Solution** built on BorgBackup with **Real-Time Monitoring**, **Database Dumps**, **AES-256 Encryption**, **Audit Trails**, **Prometheus Metrics**, **Cloud Support**, and **Automated Monthly Restore** verification.
 
-**Author:** **Urayayi Kwinika** | **Version:** 3.2.1 | **License:** MIT
+**Author:** **Urayayi Kwinika** | **Version:** 3.2.2 | **License:** MIT
 
 ---
 
@@ -130,7 +130,7 @@ sudo systemctl enable --now ukwinika-backup.timer
 sudo systemctl enable --now ukwinika-realtime-backup.service
 ```
 
-Watches directories in `REAL_TIME_DIRS` (default `/etc` and `/home`) and triggers a backup on any file change.
+Watches directories in `REAL_TIME_DIRS` (default `/etc` and `/home`) and triggers a **scoped** backup (only those paths, not full `BACKUP_PATHS`) after a debounce period (`REAL_TIME_DEBOUNCE_SEC`, default 60s).
 
 ### 7. Enable Automated Monthly Restore Drills
 
@@ -213,7 +213,7 @@ On each run the script:
 3. **Extracts** the most recent archive to an isolated directory under `RESTORE_TARGET_BASE` (default `/var/lib/ukwinika/restore-drills/`). Live data is never touched.
 4. Runs **six independent verification checks** against the extracted data, recording each as `[PASS]` or `[FAIL]`.
 5. Writes a structured result to the **audit log** (`/var/log/UKwinikaBackup_audit.log`).
-6. Updates **Prometheus metrics** with drill result, pass/fail counts, and timestamp.
+6. Updates **Prometheus metrics** (atomic rewrite of backup + restore sections).
 7. Sends a **Slack and email notification** with the overall result and check summary.
 8. **Cleans up** the drill directory on PASS; preserves it on FAIL for inspection (configurable).
 
@@ -264,6 +264,7 @@ All non-sensitive settings go in `/etc/ukwinika-backup.conf`. The path can be ov
 | `POST_HOOK` | _(empty)_ | Executable script run after backup |
 | `HOOK_FAIL_ACTION` | `fatal` | `fatal` (abort) or `warn` (continue) on hook failure |
 | `REAL_TIME_DIRS` | `("/etc" "/home")` | Directories watched by inotify |
+| `REAL_TIME_DEBOUNCE_SEC` | `60` | Seconds to wait after last change before a real-time backup |
 | `EMAIL_TO` | _(empty)_ | Email address for success/failure notifications |
 | `METRICS_ENABLED` | `yes` | Write Prometheus metrics (`yes` / `no`) |
 | `PROMETHEUS_FILE` | `/var/lib/prometheus/node_exporter/custom/ukwinika_backup.prom` | Prometheus textfile output path |
@@ -402,7 +403,7 @@ Useful alert rules: fire if `time() - ukwinika_backup_last_success_seconds > 864
 |---|---|---|
 | `ukwinika-backup.timer` | `systemd/` | Triggers backup service daily at 02:00 ± 30 min |
 | `ukwinika-backup.service` | `systemd/` | One-shot backup. `Nice=19`, `IOSchedulingClass=idle` |
-| `ukwinika-realtime-backup.service` | `systemd/` | inotify monitoring; stops after 3 rapid failures |
+| `ukwinika-realtime-backup.service` | `systemd/` | inotify monitoring; scoped backups with debounce; same hardening as daily backup |
 | `ukwinika-restore-test.timer` | `backuprestore/` | Triggers restore drill monthly on the 15th at 02:30 ± 30 min |
 | `ukwinika-restore-test.service` | `backuprestore/` | One-shot restore drill. Same hardening as backup service |
 
@@ -430,7 +431,9 @@ journalctl -u ukwinika-restore-test.service -f
 
 ## Security & Best Practices
 
-- `BORG_PASSPHRASE` and webhook URLs live exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`). No secret ever appears in arguments or the main config file.
+- `BORG_PASSPHRASE` and webhook URLs live exclusively in `/etc/ukwinika-backup.secrets` (mode `0600`). The passphrase is passed to Borg subprocesses only — not exported to the global environment.
+- Config and secrets files must be mode `600` or `400` and owned by root; both scripts enforce this at startup.
+- Always exclude your Borg repository from `BACKUP_PATHS` (included by default in `EXCLUDE_DIRS` as `/UKwinikaBackup`; also auto-excluded at runtime).
 - Borg uses `repokey` encryption (AES‑256). **Never lose the passphrase or repository key.** Export the key with `borg key export` and store it separately from the repository.
 - Both scripts use `flock` with separate lock files — they can run independently without blocking each other.
 - Restrict both scripts: `chmod 700 /usr/local/bin/enhanced_automated_backups.sh /usr/local/bin/ukwinika_automated_restore.sh`.
@@ -450,6 +453,9 @@ journalctl -u ukwinika-restore-test.service -f
 | Real-time monitoring not starting | `inotify-tools` missing | `sudo make install` |
 | MySQL dump fails | Missing `/root/.my.cnf` | Create the credentials file (see [Database Support](#database-support)) |
 | `Failed to mount USB` | USB not connected or bad `/etc/fstab` entry | Verify device and `USB_MOUNT` value |
+| `USB_RSYNC_TARGET must be inside USB_MOUNT` | Misconfigured rsync destination | Set target under the USB mount point |
+| `USB_MOUNT is on the same block device as /` | Dangerous rsync target | Fix fstab so USB is a separate device |
+| `Refusing to run: ... insecure mode` | Config/secrets world-readable | `sudo chmod 600 /etc/ukwinika-backup.conf /etc/ukwinika-backup.secrets` |
 | `Another backup instance is already running` | Stale lock after `kill -9` | If no backup is running: `rm -f /var/lock/ukwinika-backup.lock` |
 | `Another restore drill is already running` | Stale restore lock | If no drill is running: `rm -f /var/lock/ukwinika-restore-test.lock` |
 | Restore drill `[FAIL] Too few files` | Partial extraction or very small backup | Check `RESTORE_MIN_FILES`; inspect the preserved drill directory |

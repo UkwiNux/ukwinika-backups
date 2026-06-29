@@ -2,10 +2,10 @@
 # =============================================================================
 # UKwinika Automated Restore Script
 # Author: Urayayi Kwinika
-# Version: 1.0
-# Project version: 3.2.1
+# Version: 1.1
+# Project version: 3.2.2
 # Description:
-#   Automated monthly restore drill for UKwinika EABS v3.2.1 backups.
+#   Automated monthly restore drill for UKwinika EABS v3.2.2 backups.
 #   Implements the full verification workflow from docs/RESTORE-CHECKLIST.md
 #   without human interaction — suitable for scheduled execution via systemd.
 #
@@ -53,7 +53,7 @@ set -euo pipefail
 # Script identity
 # =============================================================================
 SCRIPT_NAME="$(basename "$0")"
-SCRIPT_VERSION="1.0"
+SCRIPT_VERSION="1.1"
 LOCK_FILE="/var/lock/ukwinika-restore-test.lock"
 
 # =============================================================================
@@ -77,7 +77,34 @@ if [[ -f "$UKW_SECRETS" ]]; then
 fi
 
 : "${BORG_PASSPHRASE:?ERROR: BORG_PASSPHRASE is not set. Check ${UKW_SECRETS}.}"
-export BORG_PASSPHRASE
+
+# =============================================================================
+# Security helpers
+# =============================================================================
+run_borg() {
+    env BORG_PASSPHRASE="$BORG_PASSPHRASE" borg "$@"
+}
+
+validate_config_security() {
+    [[ "${UKW_SKIP_CONFIG_SECURITY:-}" == "1" ]] && return 0
+    local f perm owner
+    for f in "$UKW_CONFIG" "$UKW_SECRETS"; do
+        [[ ! -f "$f" ]] && continue
+        perm=$(stat -c '%a' "$f" 2>/dev/null || stat -f '%OLp' "$f" 2>/dev/null || echo "")
+        owner=$(stat -c '%u' "$f" 2>/dev/null || stat -f '%u' "$f" 2>/dev/null || echo "")
+        case "$perm" in
+            600|400) ;;
+            *)
+                echo "FATAL: Refusing to run: ${f} has insecure mode ${perm} (required 600 or 400)" >&2
+                exit 1
+                ;;
+        esac
+        if [[ "$owner" != "0" ]]; then
+            echo "FATAL: Refusing to run: ${f} must be owned by root (uid 0)" >&2
+            exit 1
+        fi
+    done
+}
 
 # =============================================================================
 # Shared configuration (inherited from backup config)
@@ -142,6 +169,8 @@ die() {
     exit 1
 }
 
+validate_config_security
+
 # =============================================================================
 # Locking — separate lock file from the backup script
 # =============================================================================
@@ -199,33 +228,53 @@ notify_restore() {
 }
 
 # =============================================================================
-# Prometheus metrics — appended to existing PROMETHEUS_FILE
+# Prometheus metrics — atomic full-file rewrite (backup + restore sections)
 # =============================================================================
+_prom_read_scalar() {
+    local name="$1" default="$2"
+    if [[ -f "$PROMETHEUS_FILE" ]]; then
+        grep -E "^${name} " "$PROMETHEUS_FILE" 2>/dev/null | awk '{print $2}' | tail -1 || echo "$default"
+    else
+        echo "$default"
+    fi
+}
+
 push_restore_metrics() {
     [[ "$METRICS_ENABLED" != "yes" ]] && return 0
 
-    local result
+    local last_archive backup_ts result
+    local restore_ts restore_passed restore_failed
+
+    last_archive=$(run_borg list --short --last 1 "$BORG_REPO" 2>/dev/null || echo "none")
+    backup_ts=$(_prom_read_scalar "ukwinika_backup_last_success_seconds" "$(date +%s)")
+    restore_ts=$(date +%s)
+    restore_passed=$PASS_COUNT
+    restore_failed=$FAIL_COUNT
     result=$(( FAIL_COUNT == 0 ? 1 : 0 ))
 
     mkdir -p "$(dirname "$PROMETHEUS_FILE")"
-
-    cat >> "$PROMETHEUS_FILE" << EOF
-
+    cat > "$PROMETHEUS_FILE" << EOF
+# HELP ukwinika_backup_last_success_seconds Unix timestamp of the last successful backup
+# TYPE ukwinika_backup_last_success_seconds gauge
+ukwinika_backup_last_success_seconds ${backup_ts}
+# HELP ukwinika_backup_latest_archive Label carrying the name of the most recent archive
+# TYPE ukwinika_backup_latest_archive gauge
+ukwinika_backup_latest_archive{name="${last_archive}"} 1
 # HELP ukwinika_restore_test_last_run_seconds Unix timestamp of the last restore drill
 # TYPE ukwinika_restore_test_last_run_seconds gauge
-ukwinika_restore_test_last_run_seconds $(date +%s)
+ukwinika_restore_test_last_run_seconds ${restore_ts}
 # HELP ukwinika_restore_test_last_result Result of the last restore drill (1=pass, 0=fail)
 # TYPE ukwinika_restore_test_last_result gauge
 ukwinika_restore_test_last_result{archive="${DRILL_ARCHIVE:-unknown}"} ${result}
 # HELP ukwinika_restore_test_checks_passed Number of verification checks that passed
 # TYPE ukwinika_restore_test_checks_passed gauge
-ukwinika_restore_test_checks_passed ${PASS_COUNT}
+ukwinika_restore_test_checks_passed ${restore_passed}
 # HELP ukwinika_restore_test_checks_failed Number of verification checks that failed
 # TYPE ukwinika_restore_test_checks_failed gauge
-ukwinika_restore_test_checks_failed ${FAIL_COUNT}
+ukwinika_restore_test_checks_failed ${restore_failed}
 EOF
 
-    log "Prometheus restore metrics appended to ${PROMETHEUS_FILE}"
+    log "Prometheus metrics written to ${PROMETHEUS_FILE}"
 }
 
 # =============================================================================
@@ -245,7 +294,7 @@ ensure_repo_exists() {
 # =============================================================================
 preflight_repo_check() {
     log "Pre-flight: running full repository integrity check (borg check)..."
-    if borg check "$BORG_REPO" 2>&1 | tee -a "$RESTORE_DRILL_LOG" | tee -a "$LOG_FILE"; then
+    if run_borg check "$BORG_REPO" 2>&1 | tee -a "$RESTORE_DRILL_LOG" | tee -a "$LOG_FILE"; then
         check_pass "Repository integrity check passed"
     else
         die "Repository integrity check failed. Cannot proceed with restore drill."
@@ -262,7 +311,7 @@ preflight_disk_space() {
     mkdir -p "$RESTORE_TARGET_BASE"
 
     local archive_size_bytes
-    archive_size_bytes=$(borg info --json "${BORG_REPO}::${archive}" 2>/dev/null \
+    archive_size_bytes=$(run_borg info --json "${BORG_REPO}::${archive}" 2>/dev/null \
         | grep -o '"original_size": *[0-9]*' \
         | grep -o '[0-9]*' \
         | head -1 || echo "0")
@@ -294,7 +343,7 @@ resolve_archive() {
     local requested="$1"
 
     if [[ -n "$requested" ]]; then
-        if borg list --short "$BORG_REPO" | grep -qxF "$requested"; then
+        if run_borg list --short "$BORG_REPO" | grep -qxF "$requested"; then
             echo "$requested"
             return 0
         else
@@ -303,7 +352,7 @@ resolve_archive() {
     fi
 
     local latest
-    latest=$(borg list --short --last 1 "$BORG_REPO" 2>/dev/null || true)
+    latest=$(run_borg list --short --last 1 "$BORG_REPO" 2>/dev/null || true)
 
     if [[ -z "$latest" ]]; then
         die "No archives found in repository ${BORG_REPO}. Run a backup first."
@@ -324,7 +373,7 @@ extract_archive() {
     log "Extracting archive '${archive}' to '${target}'..."
     mkdir -p "$target"
 
-    if ( cd "$target" && borg extract "${BORG_REPO}::${archive}" ) \
+    if ( cd "$target" && run_borg extract "${BORG_REPO}::${archive}" ) \
             2>&1 | tee -a "$RESTORE_DRILL_LOG" | tee -a "$LOG_FILE"; then
         check_pass "Archive extraction completed without errors"
     else
@@ -431,7 +480,7 @@ verify_checksums() {
     if (( mismatched == 0 && checked > 0 )); then
         check_pass "Checksum verification passed for ${checked} file(s)"
     elif (( mismatched == 0 && checked == 0 )); then
-        check_pass "Checksum verification skipped — no comparable audit entries available"
+        check_fail "No audit checksum entries found for RESTORE_VERIFY_PATHS — run a backup first"
     else
         check_fail "Checksum mismatch detected in ${mismatched} file(s) — data integrity concern"
     fi
@@ -468,13 +517,13 @@ verify_archive_metadata() {
     log "Verification 6/6: Verifying archive metadata..."
 
     local archive_hostname
-    archive_hostname=$(borg info "${BORG_REPO}::${archive}" 2>/dev/null \
+    archive_hostname=$(run_borg info "${BORG_REPO}::${archive}" 2>/dev/null \
         | grep -i "hostname" \
         | awk '{print $NF}' \
         | head -1 || echo "unknown")
 
     local archive_time
-    archive_time=$(borg info "${BORG_REPO}::${archive}" 2>/dev/null \
+    archive_time=$(run_borg info "${BORG_REPO}::${archive}" 2>/dev/null \
         | grep -i "time (start)" \
         | sed 's/.*: *//' \
         | head -1 || echo "unknown")
@@ -587,7 +636,7 @@ run_drill() {
 list_archives() {
     ensure_repo_exists || die "Repository missing or invalid"
     log "Listing all archives in ${BORG_REPO}..."
-    borg list "$BORG_REPO"
+    run_borg list "$BORG_REPO"
 }
 
 # =============================================================================

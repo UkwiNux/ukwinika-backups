@@ -1,10 +1,10 @@
 # UKwinika Backup – Monthly Restore Drill Checklist
 
-**Version:** v3.2.1
+**Version:** v3.2.2
 **Purpose:** Confirm that backups are complete, restorable, and free of silent corruption.
 **Frequency:** At least once per month, and after any major system change (OS upgrade, storage migration, configuration overhaul).
 
-This checklist uses the idempotent restore features of UKwinika EABS v3.2.1 — you can repeat the drill without risk to live data.
+This checklist uses the idempotent restore features of UKwinika EABS v3.2.2 — you can repeat the drill without risk to live data.
 
 ---
 
@@ -66,11 +66,12 @@ diff -rq /etc /tmp/restore_<archive_name>/etc
 No output means the files are identical.
 
 ### b) Check SHA256 checksums against the audit log
-The audit log (`/var/log/UKwinikaBackup_audit.log`) contains checksums of all repository files recorded at backup time. Compare a specific file:
+After each backup, the script records SHA256 hashes of files listed in `RESTORE_VERIFY_PATHS` (e.g. `etc/hostname`) into `/var/log/UKwinikaBackup_audit.log`. Compare a restored file:
 ```bash
-sha256sum /tmp/restore_<archive_name>/path/to/file
-grep "path/to/file" /var/log/UKwinikaBackup_audit.log
+sha256sum /tmp/restore_<archive_name>/etc/hostname
+grep "etc/hostname$" /var/log/UKwinikaBackup_audit.log
 ```
+Repository-object checksums are written separately to `CHECKSUM_FILE` (default `/tmp/ukwinika-backup-checksums.txt`).
 
 ### c) Spot-check key configuration files
 ```bash

@@ -1,4 +1,4 @@
-# UKwinika Daily Backup Timer – v3.2.1
+# UKwinika Daily Backup Timer – v3.2.2
 # Installed by: sudo make systemd
 # Enable and start: sudo systemctl enable --now ukwinika-backup.timer
 # Check next run:   systemctl list-timers ukwinika-backup.timer

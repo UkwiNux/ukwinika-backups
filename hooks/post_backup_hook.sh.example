@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# UKwinika Post-Backup Hook – v3.2.1
+# UKwinika Post-Backup Hook – v3.2.2
 # Place at the path set in POST_HOOK inside ukwinika-backup.conf and make
 # it executable:
 #   sudo chmod +x /etc/ukwinika/post_backup_hook.sh

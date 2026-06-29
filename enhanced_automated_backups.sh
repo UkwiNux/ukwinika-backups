@@ -2,7 +2,7 @@
 # =============================================================================
 # UKwinika Enhanced Automated Backup Script – Smart Idempotent Edition
 # Author: Urayayi Kwinika
-# Version: 3.2.1
+# Version: 3.2.2
 # Description:
 #   - Fully idempotent 3‑2‑1 backup (Borg → USB → Cloud)
 #   - Safe restore with dedicated target directory
@@ -45,9 +45,9 @@ if [[ -f "$UKW_SECRETS" ]]; then
     source "$UKW_SECRETS"
 fi
 
-# BORG_PASSPHRASE must be set (either from secrets file or environment)
+# BORG_PASSPHRASE must be set (either from secrets file or environment).
+# Not exported globally — passed only to borg subprocesses via run_borg().
 : "${BORG_PASSPHRASE:?ERROR: BORG_PASSPHRASE is not set. Check ${UKW_SECRETS}.}"
-export BORG_PASSPHRASE
 
 # ---- Configuration defaults ----
 BORG_REPO="${BORG_REPO:-/UKwinikaBackup/borg-repo}"
@@ -73,6 +73,9 @@ POST_HOOK="${POST_HOOK:-}"
 HOOK_FAIL_ACTION="${HOOK_FAIL_ACTION:-fatal}"
 
 REAL_TIME_DIRS=("${REAL_TIME_DIRS[@]:-/etc /home}")
+REAL_TIME_DEBOUNCE_SEC="${REAL_TIME_DEBOUNCE_SEC:-60}"
+RESTORE_VERIFY_PATHS="${RESTORE_VERIFY_PATHS:-etc/hostname etc/os-release etc/fstab}"
+
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 EMAIL_TO="${EMAIL_TO:-}"
 METRICS_ENABLED="${METRICS_ENABLED:-yes}"
@@ -80,6 +83,44 @@ PROMETHEUS_FILE="${PROMETHEUS_FILE:-/var/lib/prometheus/node_exporter/custom/ukw
 
 DB_DUMP_DIR="${DB_DUMP_DIR:-/tmp/ukwinika-db-dump}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-/tmp/ukwinika-backup-checksums.txt}"
+
+# =============================================================================
+# Security helpers
+# =============================================================================
+run_borg() {
+    env BORG_PASSPHRASE="$BORG_PASSPHRASE" borg "$@"
+}
+
+validate_config_security() {
+    [[ "${UKW_SKIP_CONFIG_SECURITY:-}" == "1" ]] && return 0
+    local f perm owner
+    for f in "$UKW_CONFIG" "$UKW_SECRETS"; do
+        [[ ! -f "$f" ]] && continue
+        perm=$(stat -c '%a' "$f" 2>/dev/null || stat -f '%OLp' "$f" 2>/dev/null || echo "")
+        owner=$(stat -c '%u' "$f" 2>/dev/null || stat -f '%u' "$f" 2>/dev/null || echo "")
+        case "$perm" in
+            600|400) ;;
+            *)
+                echo "FATAL: Refusing to run: ${f} has insecure mode ${perm} (required 600 or 400)" >&2
+                exit 1
+                ;;
+        esac
+        if [[ "$owner" != "0" ]]; then
+            echo "FATAL: Refusing to run: ${f} must be owned by root (uid 0)" >&2
+            exit 1
+        fi
+    done
+}
+
+ensure_borg_repo_excluded() {
+    local dir repo_parent
+    repo_parent="$(dirname "$BORG_REPO")"
+    for dir in "${EXCLUDE_DIRS[@]}"; do
+        [[ "$dir" == "$BORG_REPO" || "$dir" == "$repo_parent" || "$dir" == "${repo_parent}/" ]] && return 0
+    done
+    EXCLUDE_DIRS+=("$BORG_REPO")
+    log "Auto-excluded BORG_REPO from backup paths: ${BORG_REPO}"
+}
 
 # =============================================================================
 # Logging helpers
@@ -90,6 +131,9 @@ audit() {
     [[ -n "${2:-}" && -f "$2" ]] && sha256sum "$2" >> "$AUDIT_LOG" || true
 }
 die()   { log "FATAL: $*"; notify "FAILED: $*"; exit 1; }
+
+validate_config_security
+ensure_borg_repo_excluded
 
 # =============================================================================
 # Locking
@@ -180,8 +224,16 @@ borg_backup() {
     local extra_paths=()
     [[ -n "$dump_path" ]] && extra_paths+=("$dump_path")
 
+    local paths_to_backup=()
+    if [[ "${UKW_REALTIME_TRIGGER:-}" == "1" ]]; then
+        paths_to_backup=("${REAL_TIME_DIRS[@]}")
+        log "Real-time trigger: backing up monitored paths only: ${paths_to_backup[*]}"
+    else
+        paths_to_backup=("${BACKUP_PATHS[@]}")
+    fi
+
     log "Creating Borg archive '${archive_name}'..."
-    borg create              \
+    run_borg create              \
         --verbose            \
         --filter AME         \
         --list               \
@@ -191,12 +243,12 @@ borg_backup() {
         --exclude-caches     \
         "${exclude_args[@]}" \
         "${BORG_REPO}::${archive_name}" \
-        "${BACKUP_PATHS[@]}" \
+        "${paths_to_backup[@]}" \
         "${extra_paths[@]}"  \
         || die "borg create failed"
 
     log "Pruning old archives (keep-within ${RETENTION_DAYS}d, keep-last ${RETENTION_VERSIONS})..."
-    borg prune               \
+    run_borg prune               \
         --list               \
         --show-rc            \
         --keep-within "${RETENTION_DAYS}d" \
@@ -208,18 +260,53 @@ borg_backup() {
 # =============================================================================
 # USB secondary copy
 # =============================================================================
+validate_usb_mount() {
+    local root_dev usb_dev usb_fstype
+
+    if ! mountpoint -q "$USB_MOUNT"; then
+        log "Mounting USB at ${USB_MOUNT}..."
+        mount "$USB_MOUNT" || die "Failed to mount USB at ${USB_MOUNT}"
+    fi
+
+    usb_fstype=$(findmnt -n -o FSTYPE --target "$USB_MOUNT" 2>/dev/null || true)
+    if [[ -z "$usb_fstype" ]]; then
+        die "USB_MOUNT (${USB_MOUNT}) is not a mounted filesystem"
+    fi
+
+    root_dev=$(findmnt -n -o SOURCE --target / 2>/dev/null || true)
+    usb_dev=$(findmnt -n -o SOURCE --target "$USB_MOUNT" 2>/dev/null || true)
+    if [[ -n "$root_dev" && "$root_dev" == "$usb_dev" ]]; then
+        die "USB_MOUNT (${USB_MOUNT}) is on the same block device as / — refusing rsync --delete"
+    fi
+}
+
+validate_usb_target() {
+    local resolved_mount resolved_target
+
+    resolved_mount=$(realpath -m "$USB_MOUNT")
+    resolved_target=$(realpath -m "$USB_RSYNC_TARGET")
+
+    case "${resolved_target}/" in
+        "${resolved_mount}/"*) return 0 ;;
+        *)
+            die "USB_RSYNC_TARGET (${USB_RSYNC_TARGET}) must be inside USB_MOUNT (${USB_MOUNT})"
+            ;;
+    esac
+
+    if [[ ! -d "$USB_RSYNC_TARGET" ]]; then
+        log "Creating USB rsync target directory: ${USB_RSYNC_TARGET}"
+        mkdir -p "$USB_RSYNC_TARGET" || die "Failed to create USB_RSYNC_TARGET (${USB_RSYNC_TARGET})"
+    fi
+}
+
 sync_to_usb() {
     if [[ -z "$USB_RSYNC_TARGET" ]]; then
         log "No USB target configured. Skipping secondary copy."
         return 0
     fi
 
-    if mountpoint -q "$USB_MOUNT"; then
-        log "USB already mounted at ${USB_MOUNT}."
-    else
-        log "Mounting USB at ${USB_MOUNT}..."
-        mount "$USB_MOUNT" || die "Failed to mount USB at ${USB_MOUNT}"
-    fi
+    validate_usb_mount
+    validate_usb_target
 
     log "Syncing Borg repository to USB (rsync -a --delete)..."
     rsync -a --delete "${BORG_REPO}/" "${USB_RSYNC_TARGET}/" \
@@ -249,33 +336,99 @@ cloud_upload() {
 }
 
 # =============================================================================
-# Audit – SHA256 checksums of all repository objects
+# Audit – SHA256 checksums of repository objects + restore drill paths
 # =============================================================================
 audit_checksum() {
     log "Generating SHA256 checksums of repository..."
     find "$BORG_REPO" -type f -exec sha256sum {} + > "$CHECKSUM_FILE"
-    audit "Checksums saved to ${CHECKSUM_FILE}"
+    audit "Checksums saved to ${CHECKSUM_FILE}" "$CHECKSUM_FILE"
+}
+
+audit_verify_path_checksums() {
+    local rel_path live_path
+
+    audit "Recording SHA256 checksums for restore drill verification paths"
+    for rel_path in $RESTORE_VERIFY_PATHS; do
+        live_path="/${rel_path}"
+        if [[ -f "$live_path" ]]; then
+            sha256sum "$live_path" >> "$AUDIT_LOG"
+        else
+            log "WARNING: RESTORE_VERIFY_PATHS entry not found on live system: ${live_path}"
+        fi
+    done
 }
 
 # =============================================================================
-# Prometheus metrics
+# Prometheus metrics (atomic full-file rewrite; preserves restore metrics)
 # =============================================================================
-push_metrics() {
+_prom_read_scalar() {
+    local name="$1" default="$2"
+    if [[ -f "$PROMETHEUS_FILE" ]]; then
+        grep -E "^${name} " "$PROMETHEUS_FILE" 2>/dev/null | awk '{print $2}' | tail -1 || echo "$default"
+    else
+        echo "$default"
+    fi
+}
+
+_prom_read_restore_archive() {
+    if [[ -f "$PROMETHEUS_FILE" ]]; then
+        grep -E '^ukwinika_restore_test_last_result{' "$PROMETHEUS_FILE" 2>/dev/null \
+            | sed -n 's/.*archive="\([^"]*\)".*/\1/p' | tail -1 || echo "unknown"
+    else
+        echo "unknown"
+    fi
+}
+
+_prom_read_restore_result() {
+    if [[ -f "$PROMETHEUS_FILE" ]]; then
+        grep -E '^ukwinika_restore_test_last_result{' "$PROMETHEUS_FILE" 2>/dev/null \
+            | sed -n 's/.*} \([0-9]*\)$/\1/p' | tail -1 || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+write_prometheus_metrics() {
     [[ "$METRICS_ENABLED" != "yes" ]] && return 0
 
-    local last_archive
-    last_archive=$(borg list --short --last 1 "$BORG_REPO" 2>/dev/null || echo "none")
+    local last_archive backup_ts
+    local restore_ts restore_result restore_passed restore_failed restore_archive
+
+    last_archive=$(run_borg list --short --last 1 "$BORG_REPO" 2>/dev/null || echo "none")
+    backup_ts=$(date +%s)
+
+    restore_ts=$(_prom_read_scalar "ukwinika_restore_test_last_run_seconds" "0")
+    restore_result=$(_prom_read_restore_result)
+    restore_passed=$(_prom_read_scalar "ukwinika_restore_test_checks_passed" "0")
+    restore_failed=$(_prom_read_scalar "ukwinika_restore_test_checks_failed" "0")
+    restore_archive=$(_prom_read_restore_archive)
 
     mkdir -p "$(dirname "$PROMETHEUS_FILE")"
     cat > "$PROMETHEUS_FILE" << EOF
 # HELP ukwinika_backup_last_success_seconds Unix timestamp of the last successful backup
 # TYPE ukwinika_backup_last_success_seconds gauge
-ukwinika_backup_last_success_seconds $(date +%s)
+ukwinika_backup_last_success_seconds ${backup_ts}
 # HELP ukwinika_backup_latest_archive Label carrying the name of the most recent archive
 # TYPE ukwinika_backup_latest_archive gauge
 ukwinika_backup_latest_archive{name="${last_archive}"} 1
+# HELP ukwinika_restore_test_last_run_seconds Unix timestamp of the last restore drill
+# TYPE ukwinika_restore_test_last_run_seconds gauge
+ukwinika_restore_test_last_run_seconds ${restore_ts}
+# HELP ukwinika_restore_test_last_result Result of the last restore drill (1=pass, 0=fail)
+# TYPE ukwinika_restore_test_last_result gauge
+ukwinika_restore_test_last_result{archive="${restore_archive}"} ${restore_result}
+# HELP ukwinika_restore_test_checks_passed Number of verification checks that passed
+# TYPE ukwinika_restore_test_checks_passed gauge
+ukwinika_restore_test_checks_passed ${restore_passed}
+# HELP ukwinika_restore_test_checks_failed Number of verification checks that failed
+# TYPE ukwinika_restore_test_checks_failed gauge
+ukwinika_restore_test_checks_failed ${restore_failed}
 EOF
     log "Prometheus metrics written to ${PROMETHEUS_FILE}"
+}
+
+push_metrics() {
+    write_prometheus_metrics
 }
 
 # =============================================================================
@@ -302,16 +455,22 @@ notify() {
 # Real-time monitoring
 # =============================================================================
 real_time_mode() {
-    log "Starting real-time monitoring (inotify) on: ${REAL_TIME_DIRS[*]}"
+    log "Starting real-time monitoring (inotify) on: ${REAL_TIME_DIRS[*]} (debounce: ${REAL_TIME_DEBOUNCE_SEC}s)"
     command -v inotifywait >/dev/null 2>&1 \
         || die "inotify-tools not installed. Run: sudo make install"
 
     while true; do
-        inotifywait -r -e modify,create,delete \
+        inotifywait -r -e modify,create,delete,move \
             "${REAL_TIME_DIRS[@]}" 2>/dev/null || true
-        log "Change detected – triggering backup in child process."
+        log "Change detected – coalescing for ${REAL_TIME_DEBOUNCE_SEC}s before backup."
+        while inotifywait -r -t "$REAL_TIME_DEBOUNCE_SEC" \
+            -e modify,create,delete,move \
+            "${REAL_TIME_DIRS[@]}" 2>/dev/null; do
+            log "Additional changes detected – extending debounce window."
+        done
+        log "Debounce complete – triggering scoped backup in child process."
         flock -u 200 2>/dev/null || true
-        "$0" backup
+        UKW_REALTIME_TRIGGER=1 "$0" backup
         flock -n 200 || true
     done
 }
@@ -327,7 +486,7 @@ restore_backup() {
     local target="${2:-/tmp/restore_${archive}}"
     log "Restoring archive '${archive}' to '${target}'..."
     mkdir -p "$target"
-    ( cd "$target" && borg extract "${BORG_REPO}::${archive}" ) \
+    ( cd "$target" && run_borg extract "${BORG_REPO}::${archive}" ) \
         || die "borg extract failed"
     log "Restore completed successfully to ${target}"
 }
@@ -336,11 +495,11 @@ restore_backup() {
 # Convenience wrappers
 # =============================================================================
 list_archives() {
-    borg list "$BORG_REPO" || die "Cannot list archives"
+    run_borg list "$BORG_REPO" || die "Cannot list archives"
 }
 
 check_repo() {
-    borg check "$BORG_REPO" || die "Repository check failed"
+    run_borg check "$BORG_REPO" || die "Repository check failed"
 }
 
 # =============================================================================
@@ -364,6 +523,7 @@ run_backup() {
     local dump_path
     dump_path=$(db_dump)
     borg_backup "$dump_path"
+    audit_verify_path_checksums
     sync_to_usb
     cloud_upload
     audit_checksum
@@ -404,7 +564,7 @@ case "${1:-}" in
         fi
         log "Initialising new Borg repository at ${BORG_REPO}..."
         mkdir -p "$(dirname "$BORG_REPO")"
-        borg init --encryption=repokey "$BORG_REPO" \
+        run_borg init --encryption=repokey "$BORG_REPO" \
             || die "borg init failed"
         log "Repository initialised successfully at ${BORG_REPO}."
         ;;

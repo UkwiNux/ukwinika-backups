@@ -236,6 +236,7 @@ EOF
 export UKW_CONFIG="$CONFIG"
 export UKW_SECRETS="$SECRETS"
 export BORG_PASSPHRASE="local-test-passphrase"
+export UKW_SKIP_CONFIG_SECURITY=1
 
 # Backup smoke test
 borg init --encryption=repokey "${REPO}/borg-repo"

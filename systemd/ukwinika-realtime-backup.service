@@ -1,4 +1,4 @@
-# UKwinika Real-Time Backup Monitoring Service – v3.2.1
+# UKwinika Real-Time Backup Monitoring Service – v3.2.2
 # Installed by: sudo make systemd
 # Enable and start: sudo systemctl enable --now ukwinika-realtime-backup.service
 # View logs:        journalctl -u ukwinika-realtime-backup.service -f
@@ -30,6 +30,14 @@ StartLimitIntervalSec=60
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
+
+# Harden the service: allow writes only to expected paths.
+# Remove or adjust these if your BORG_REPO or log paths differ.
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/lock /var/lib/prometheus /UKwinikaBackup /mnt /tmp
+ProtectHome=read-only
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
