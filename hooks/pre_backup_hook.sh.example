@@ -1,0 +1,30 @@
+#!/bin/bash
+# =============================================================================
+# UKwinika Pre-Backup Hook – v3.2.2
+# Place at the path set in PRE_HOOK inside ukwinika-backup.conf and make
+# it executable:
+#   sudo chmod +x /etc/ukwinika/pre_backup_hook.sh
+#
+# This script is EXECUTED (not sourced) by the main backup script.
+# It must exit 0 on success.
+# A non-zero exit code triggers the HOOK_FAIL_ACTION behaviour:
+#   fatal (default) → backup aborts and a failure notification is sent
+#   warn            → a warning is logged and the backup continues
+#
+# This hook runs before the database dump and Borg archive creation.
+# Use it to stop services, flush database logs, or take LVM snapshots.
+# =============================================================================
+
+echo "$(date '+%F %T') [HOOK] Pre-Backup Hook started" >> /var/log/UKwinikaBackup.log
+
+# Example: stop a service before backup
+# systemctl stop apache2
+
+# Example: flush MySQL binary logs for a consistent snapshot
+# mysql -e "FLUSH LOGS;"
+
+# Example: take an LVM snapshot
+# lvcreate -L10G -s -n backup_snap /dev/vg0/data
+
+echo "$(date '+%F %T') [HOOK] Pre-Backup Hook completed" >> /var/log/UKwinikaBackup.log
+exit 0

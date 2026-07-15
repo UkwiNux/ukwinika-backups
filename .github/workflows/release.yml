@@ -1,0 +1,36 @@
+name: Create Release Tarball
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-tarball:
+    # Build once on ubuntu-latest; the tarball is distribution-agnostic bash.
+    # If per-distro smoke tests are needed, add a separate matrix job below.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Create release tarball
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          tar -czf "ukwinika-backups-${TAG}.tar.gz" \
+            --exclude-vcs \
+            --exclude='.github' \
+            --exclude='*.md' \
+            --transform "s|^|ukwinika-backups-${TAG}/|" \
+            .
+
+      - name: Upload tarball as release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ukwinika-backups-${{ github.event.release.tag_name }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
