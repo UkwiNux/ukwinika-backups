@@ -1,0 +1,36 @@
+# UKwinika Daily Backup Service – v3.2.2
+# Installed by: sudo make systemd
+# Triggered by: ukwinika-backup.timer (daily at 02:00 ± 30 min)
+# Run manually:  sudo systemctl start ukwinika-backup.service
+
+[Unit]
+Description=UKwinika Daily Idempotent Backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# Config and secrets paths injected as environment variables.
+# Override these in a drop-in if your paths differ from the defaults.
+Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
+Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
+
+ExecStart=/usr/local/bin/enhanced_automated_backups.sh backup
+
+User=root
+
+# Run at lowest CPU and I/O priority to avoid impacting interactive workloads.
+Nice=19
+IOSchedulingClass=idle
+
+# Give the service its own /tmp so temporary files (DB dumps, checksum files)
+# are isolated and cleaned up automatically when the service exits.
+PrivateTmp=true
+
+# Harden the service: allow writes only to expected paths.
+# Remove or adjust these if your BORG_REPO or log paths differ.
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/lock /var/lib/prometheus /UKwinikaBackup /mnt /tmp
+ProtectHome=read-only
+NoNewPrivileges=true

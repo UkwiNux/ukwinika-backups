@@ -1,0 +1,39 @@
+#!/bin/bash
+# =============================================================================
+# UKwinika Post-Backup Hook – v3.2.2
+# Place at the path set in POST_HOOK inside ukwinika-backup.conf and make
+# it executable:
+#   sudo chmod +x /etc/ukwinika/post_backup_hook.sh
+#
+# This script is EXECUTED (not sourced) by the main backup script.
+# It must exit 0 on success.
+# A non-zero exit code triggers the HOOK_FAIL_ACTION behaviour:
+#   fatal (default) → a failure notification is sent and the script exits
+#   warn            → a warning is logged and the script continues
+#
+# This hook runs AFTER the backup cycle is complete and AFTER the built-in
+# Slack/email notifications have already been sent by the script itself.
+# Use it for additional alerting, service restarts, or custom reporting —
+# but avoid duplicating the built-in notifications unless intentional.
+# =============================================================================
+
+echo "$(date '+%F %T') [HOOK] Post-Backup Hook started" >> /var/log/UKwinikaBackup.log
+
+# Example: restart a service that was stopped in the pre-backup hook
+# systemctl start apache2
+
+# Example: remove an LVM snapshot taken in the pre-backup hook
+# lvremove -f /dev/vg0/backup_snap
+
+# Example: send a custom Slack message (webhook sourced from secrets file via env)
+# Note: the script already sends "Backup SUCCESS on <hostname>" or
+#       "Backup FAILED: <reason> on <hostname>" via SLACK_WEBHOOK.
+#       Only add this block if you need a different channel or message format.
+# if [ -n "$SLACK_WEBHOOK" ]; then
+#     curl -s -X POST -H 'Content-type: application/json' \
+#         --data "{\"text\":\"✅ Backup post-processing complete on $(hostname)\"}" \
+#         "$SLACK_WEBHOOK"
+# fi
+
+echo "$(date '+%F %T') [HOOK] Post-Backup Hook completed" >> /var/log/UKwinikaBackup.log
+exit 0

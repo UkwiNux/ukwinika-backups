@@ -1,0 +1,31 @@
+# =============================================================================
+# UKwinika Backup – .gitignore
+# =============================================================================
+
+# --- Secrets & sensitive files -----------------------------------------------
+# Never commit credentials or local configuration to version control.
+*.secrets
+ukwinika-backup.conf
+*.env
+
+# --- Runtime output files ----------------------------------------------------
+# Prometheus textfile collector output — written at runtime, not source files.
+*.prom
+
+# --- Temporary files ---------------------------------------------------------
+*.tmp
+/temp_*
+/*.gpg
+
+# --- Logs (do not commit live logs) ------------------------------------------
+*.log
+
+# --- Editor & IDE files ------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- OS-generated files ------------------------------------------------------
+.DS_Store
+Thumbs.db
