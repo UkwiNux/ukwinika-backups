@@ -3,7 +3,7 @@
 # UKwinika Automated Restore Script
 # Author: Urayayi Kwinika
 # Version: 1.1
-# Project version: 3.2.2
+# Project version: 3.3.0
 # Description:
 #   Automated monthly restore drill for UKwinika EABS v3.2.2 backups.
 #   Implements the full verification workflow from docs/RESTORE-CHECKLIST.md
