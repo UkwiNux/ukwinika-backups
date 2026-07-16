@@ -50,12 +50,17 @@ jobs:
           # RESTORE_VERIFY_PATHS uses paths relative to the archive root (etc/hostname).
           cat > "$CONFIG" <<CONFEOF
 BORG_REPO=${REPO}/borg-repo
+MIN_BORG_VERSION=1.2.0
 BACKUP_PATHS=("/etc")
 EXCLUDE_DIRS=()
 RETENTION_DAYS=7
 RETENTION_VERSIONS=1
 USB_RSYNC_TARGET=
+USB_RETRY_ATTEMPTS=1
+USB_RETRY_DELAY_SEC=1
 CLOUD_REMOTE=
+CLOUD_RETRY_ATTEMPTS=1
+CLOUD_RETRY_DELAY_SEC=1
 DB_TYPE=none
 DB_DUMP_DIR=${REPO}/db-dump
 CHECKSUM_FILE=${REPO}/checksums.txt
@@ -71,6 +76,8 @@ RESTORE_VERIFY_PATHS=etc/hostname
 RESTORE_MIN_FILES=10
 RESTORE_KEEP_ON_FAILURE=no
 RESTORE_DRILL_LOG=${REPO}/restore.log
+CHECK_STATE_FILE=${REPO}/last-check-timestamp
+CHECK_INTERVAL_DAYS=7
 CONFEOF
 
           export UKW_CONFIG="$CONFIG"
@@ -81,16 +88,33 @@ CONFEOF
           # Initialise repository
           borg init --encryption=repokey "${REPO}/borg-repo"
 
+          # Configuration validation (no side effects)
+          bash enhanced_automated_backups.sh validate
+
+          # Dry-run must not create an archive or touch prune/USB/cloud/metrics
+          bash enhanced_automated_backups.sh backup --dry-run
+          ARCHIVE_COUNT_BEFORE=$(borg list --short "${REPO}/borg-repo" | wc -l)
+          if [ "$ARCHIVE_COUNT_BEFORE" -ne 0 ]; then
+            echo "❌ Dry-run created an archive — expected none"; exit 1
+          fi
+
           # Backup smoke test
           bash enhanced_automated_backups.sh backup
           bash enhanced_automated_backups.sh list
           bash enhanced_automated_backups.sh check
 
+          # Scheduled consistency-check due-date tracking: first call must run,
+          # second call (same day) must skip.
+          bash enhanced_automated_backups.sh check-if-due
+          test -f "${REPO}/last-check-timestamp" || { echo "❌ CHECK_STATE_FILE not written"; exit 1; }
+          bash enhanced_automated_backups.sh check-if-due | grep -q "not due yet" \
+            || { echo "❌ check-if-due did not skip on second call"; exit 1; }
+
           # Restore drill smoke test against the archive just created
           bash backuprestore/ukwinika_automated_restore.sh list
           bash backuprestore/ukwinika_automated_restore.sh test
 
-          echo "✅ Backup and restore drill smoke tests passed"
+          echo "✅ Backup, dry-run, scheduled-check, and restore drill smoke tests passed"
           rm -rf "$REPO" "$SECRETS" "$CONFIG"
 
       - name: Check example config and secrets files exist
@@ -101,12 +125,14 @@ CONFEOF
 
       - name: Verify all documented variables present in conf.example
         run: |
-          for var in BORG_REPO BACKUP_PATHS EXCLUDE_DIRS RETENTION_DAYS \
-                     RETENTION_VERSIONS USB_MOUNT USB_RSYNC_TARGET CLOUD_REMOTE \
+          for var in BORG_REPO MIN_BORG_VERSION BACKUP_PATHS EXCLUDE_DIRS RETENTION_DAYS \
+                     RETENTION_VERSIONS USB_MOUNT USB_RSYNC_TARGET USB_RETRY_ATTEMPTS \
+                     USB_RETRY_DELAY_SEC CLOUD_REMOTE CLOUD_RETRY_ATTEMPTS CLOUD_RETRY_DELAY_SEC \
                      DB_TYPE DB_DUMP_DIR PRE_HOOK POST_HOOK HOOK_FAIL_ACTION \
                      REAL_TIME_DIRS REAL_TIME_DEBOUNCE_SEC EMAIL_TO METRICS_ENABLED PROMETHEUS_FILE \
                      CHECKSUM_FILE RESTORE_TARGET_BASE RESTORE_VERIFY_PATHS \
-                     RESTORE_MIN_FILES RESTORE_KEEP_ON_FAILURE RESTORE_DRILL_LOG; do
+                     RESTORE_MIN_FILES RESTORE_KEEP_ON_FAILURE RESTORE_DRILL_LOG \
+                     CHECK_STATE_FILE CHECK_INTERVAL_DAYS; do
             grep -q "^${var}=" config/ukwinika-backup.conf.example \
               || grep -q "^# ${var}" config/ukwinika-backup.conf.example \
               || (echo "MISSING in conf.example: ${var}" && exit 1)
@@ -119,3 +145,15 @@ CONFEOF
           test -f backuprestore/ukwinika-restore-test.service
           test -f backuprestore/ukwinika-restore-test.timer
           echo "✅ backuprestore/ folder is complete"
+
+      - name: Verify v3.3.0 supporting files are present
+        run: |
+          test -f systemd/ukwinika-check.service
+          test -f systemd/ukwinika-check.timer
+          test -f hooks/lvm_snapshot_pre_backup_hook.sh.example
+          test -f hooks/lvm_snapshot_post_backup_hook.sh.example
+          test -f docs/DISASTER-RECOVERY.md
+          test -f prometheus/ukwinika-backup-alerts.yml
+          bash -n hooks/lvm_snapshot_pre_backup_hook.sh.example
+          bash -n hooks/lvm_snapshot_post_backup_hook.sh.example
+          echo "✅ v3.3.0 supporting files present and hook scripts pass syntax check"
