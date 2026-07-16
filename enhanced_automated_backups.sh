@@ -346,9 +346,12 @@ audit_checksum() {
 
 audit_verify_path_checksums() {
     local rel_path live_path
+    local -a verify_paths=()
+
+    read -r -a verify_paths <<< "$RESTORE_VERIFY_PATHS"
 
     audit "Recording SHA256 checksums for restore drill verification paths"
-    for rel_path in $RESTORE_VERIFY_PATHS; do
+    for rel_path in "${verify_paths[@]}"; do
         live_path="/${rel_path}"
         if [[ -f "$live_path" ]]; then
             sha256sum "$live_path" >> "$AUDIT_LOG"

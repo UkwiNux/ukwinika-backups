@@ -18,12 +18,17 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y borgbackup rsync inotify-tools mailutils
+          sudo apt-get install -y borgbackup rsync inotify-tools mailutils shellcheck
 
       - name: Make scripts executable
         run: |
           chmod +x enhanced_automated_backups.sh
           chmod +x backuprestore/ukwinika_automated_restore.sh
+
+      - name: ShellCheck — backup and restore scripts
+        run: |
+          shellcheck enhanced_automated_backups.sh
+          shellcheck backuprestore/ukwinika_automated_restore.sh
 
       - name: Bash syntax check — backup script
         run: bash -n enhanced_automated_backups.sh

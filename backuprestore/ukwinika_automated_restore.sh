@@ -401,11 +401,16 @@ verify_non_empty() {
 
 verify_mandatory_paths() {
     local target="$1"
+    local rel_path full_path
+    local -a verify_paths=()
+
+    read -r -a verify_paths <<< "$RESTORE_VERIFY_PATHS"
+
     log "Verification 2/6: Checking mandatory paths (${RESTORE_VERIFY_PATHS})..."
 
     local all_present=true
-    for rel_path in $RESTORE_VERIFY_PATHS; do
-        local full_path="${target}/${rel_path}"
+    for rel_path in "${verify_paths[@]}"; do
+        full_path="${target}/${rel_path}"
         if [[ -e "$full_path" ]]; then
             log "  Found: ${rel_path}"
         else
@@ -438,6 +443,9 @@ verify_file_count() {
 
 verify_checksums() {
     local target="$1"
+    local rel_path full_path restored_sum audit_sum
+    local -a verify_paths=()
+    read -r -a verify_paths <<< "$RESTORE_VERIFY_PATHS"
     log "Verification 4/6: SHA256 spot-check against audit log (${AUDIT_LOG})..."
 
     if [[ ! -f "$AUDIT_LOG" ]]; then
@@ -449,14 +457,12 @@ verify_checksums() {
     local checked=0
     local mismatched=0
 
-    for rel_path in $RESTORE_VERIFY_PATHS; do
-        local full_path="${target}/${rel_path}"
+    for rel_path in "${verify_paths[@]}"; do
+        full_path="${target}/${rel_path}"
         [[ ! -f "$full_path" ]] && continue
 
-        local restored_sum
         restored_sum=$(sha256sum "$full_path" | awk '{print $1}')
 
-        local audit_sum
         audit_sum=$(grep "${rel_path}$" "$AUDIT_LOG" 2>/dev/null \
             | tail -1 \
             | awk '{print $1}' || true)

@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`ukwinika-realtime-backup.service`** — aligned systemd hardening with the daily backup unit (`ProtectSystem=strict`, `PrivateTmp`, `NoNewPrivileges`, etc.).
 - **`ukwinika_automated_restore.sh`** bumped to v1.1.
+- **CI** — added `shellcheck` static analysis for both main scripts (`.shellcheckrc` included).
+- **Release workflow** — bumped `softprops/action-gh-release` to v3; release tarballs now include documentation (`*.md` no longer excluded).
 
 ---
 
