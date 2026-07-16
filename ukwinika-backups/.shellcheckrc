@@ -1,5 +1,0 @@
-# ShellCheck configuration for ukwinika-backups
-shell=bash
-
-# Variables are assigned in sourced config/secrets files (see shellcheck source= directives).
-external-sources=true
