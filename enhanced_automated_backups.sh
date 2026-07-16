@@ -2,7 +2,7 @@
 # =============================================================================
 # UKwinika Enhanced Automated Backup Script – Smart Idempotent Edition
 # Author: Urayayi Kwinika
-# Version: 3.2.2
+# Version: 3.3.0
 # Description:
 #   - Fully idempotent 3‑2‑1 backup (Borg → USB → Cloud)
 #   - Safe restore with dedicated target directory
@@ -14,11 +14,18 @@
 #   - Real-time monitoring uses a child process to avoid lock re-acquisition
 #   - Failure notifications alongside success notifications
 #   - borg extract uses cd subshell for borg 1.2.x compatibility (no --target flag)
+#   - Minimum borg version enforcement
+#   - Retry/backoff for cloud upload and USB mount (transient failure tolerance)
+#   - Config validation subcommand (no side effects)
+#   - Dry-run mode for backup
+#   - Scheduled consistency-check due-date tracking (borgmatic-style "checks")
 # Usage:
-#   backup                      Run full backup cycle
+#   backup [--dry-run]          Run full backup cycle
 #   restore <archive> [target]  Restore archive to target (default /tmp/restore_<archive>)
 #   list                        List archives
-#   check                       Verify repository integrity
+#   check                       Force a full repository integrity check now
+#   check-if-due                Run repository check only if CHECK_INTERVAL_DAYS has elapsed
+#   validate                    Validate configuration and environment; no side effects
 #   real-time                   Monitor directories and backup on changes
 #   init                        Initialise a new Borg repository
 # =============================================================================
@@ -84,6 +91,22 @@ PROMETHEUS_FILE="${PROMETHEUS_FILE:-/var/lib/prometheus/node_exporter/custom/ukw
 DB_DUMP_DIR="${DB_DUMP_DIR:-/tmp/ukwinika-db-dump}"
 CHECKSUM_FILE="${CHECKSUM_FILE:-/tmp/ukwinika-backup-checksums.txt}"
 
+# ---- Borg version enforcement ----
+MIN_BORG_VERSION="${MIN_BORG_VERSION:-1.2.0}"
+
+# ---- Retry/backoff for transient failures (USB mount, cloud upload) ----
+USB_RETRY_ATTEMPTS="${USB_RETRY_ATTEMPTS:-3}"
+USB_RETRY_DELAY_SEC="${USB_RETRY_DELAY_SEC:-5}"
+CLOUD_RETRY_ATTEMPTS="${CLOUD_RETRY_ATTEMPTS:-3}"
+CLOUD_RETRY_DELAY_SEC="${CLOUD_RETRY_DELAY_SEC:-15}"
+
+# ---- Scheduled consistency-check due-date tracking (borgmatic-style) ----
+CHECK_STATE_FILE="${CHECK_STATE_FILE:-/var/lib/ukwinika/last-check-timestamp}"
+CHECK_INTERVAL_DAYS="${CHECK_INTERVAL_DAYS:-7}"
+
+# ---- Dry-run flag (set by CLI dispatch, not meant to be set in config) ----
+DRY_RUN="${DRY_RUN:-0}"
+
 # =============================================================================
 # Security helpers
 # =============================================================================
@@ -112,6 +135,36 @@ validate_config_security() {
     done
 }
 
+check_borg_version() {
+    command -v borg >/dev/null 2>&1 || die "borg is not installed or not on PATH"
+    local ver
+    ver=$(borg --version 2>/dev/null | awk '{print $2}')
+    [[ -z "$ver" ]] && die "Unable to determine installed borg version"
+    if [[ "$(printf '%s\n%s\n' "$MIN_BORG_VERSION" "$ver" | sort -V | head -1)" != "$MIN_BORG_VERSION" ]]; then
+        die "borg version ${ver} is older than the required minimum ${MIN_BORG_VERSION}. Upgrade borgbackup."
+    fi
+    log "borg version check passed (${ver} >= required ${MIN_BORG_VERSION})"
+}
+
+# retry <attempts> <delay_sec> -- <command...>
+# Generic retry/backoff wrapper for transient failures (network mounts, cloud
+# uploads). Does not retry logic/validation errors, only the command's exit code.
+retry() {
+    local attempts="$1" delay="$2"
+    shift 2
+    local n=1
+    until "$@"; do
+        if (( n >= attempts )); then
+            log "WARNING: command failed after ${attempts} attempt(s): $*"
+            return 1
+        fi
+        log "WARNING: command failed (attempt ${n}/${attempts}). Retrying in ${delay}s: $*"
+        sleep "$delay"
+        n=$(( n + 1 ))
+    done
+    return 0
+}
+
 ensure_borg_repo_excluded() {
     local dir repo_parent
     repo_parent="$(dirname "$BORG_REPO")"
@@ -128,7 +181,9 @@ ensure_borg_repo_excluded() {
 log()   { echo "$(date '+%F %T') $SCRIPT_NAME: $*" | tee -a "$LOG_FILE"; }
 audit() {
     echo "$(date '+%F %T') [AUDIT] $1" | tee -a "$AUDIT_LOG"
-    [[ -n "${2:-}" && -f "$2" ]] && sha256sum "$2" >> "$AUDIT_LOG" || true
+    if [[ -n "${2:-}" && -f "$2" ]]; then
+        sha256sum "$2" >> "$AUDIT_LOG"
+    fi
 }
 die()   { log "FATAL: $*"; notify "FAILED: $*"; exit 1; }
 
@@ -190,6 +245,12 @@ db_dump() {
             ;;
         postgresql)
             log "Dumping all PostgreSQL databases..."
+            # shellcheck disable=SC2024
+            # Rationale: this script always runs as root (systemd User=root),
+            # so the redirect's file descriptor is opened by the parent (root)
+            # shell BEFORE sudo drops privilege to `postgres`; pg_dumpall
+            # inherits the already-open fd, so the dump is written correctly
+            # regardless of postgres's own filesystem permissions on DB_DUMP_DIR.
             sudo -u postgres pg_dumpall \
                 > "${DB_DUMP_DIR}/postgresql-all.sql" \
                 || die "PostgreSQL dump failed"
@@ -232,7 +293,14 @@ borg_backup() {
         paths_to_backup=("${BACKUP_PATHS[@]}")
     fi
 
-    log "Creating Borg archive '${archive_name}'..."
+    local dry_run_args=()
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        dry_run_args+=(--dry-run)
+        log "DRY RUN: Simulating Borg archive creation for '${archive_name}' (no data will be written)..."
+    else
+        log "Creating Borg archive '${archive_name}'..."
+    fi
+
     run_borg create              \
         --verbose            \
         --filter AME         \
@@ -241,11 +309,17 @@ borg_backup() {
         --show-rc            \
         --compression lz4    \
         --exclude-caches     \
+        "${dry_run_args[@]}" \
         "${exclude_args[@]}" \
         "${BORG_REPO}::${archive_name}" \
         "${paths_to_backup[@]}" \
         "${extra_paths[@]}"  \
         || die "borg create failed"
+
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        log "DRY RUN: Skipping prune (no archive was actually created)."
+        return 0
+    fi
 
     log "Pruning old archives (keep-within ${RETENTION_DAYS}d, keep-last ${RETENTION_VERSIONS})..."
     run_borg prune               \
@@ -264,8 +338,9 @@ validate_usb_mount() {
     local root_dev usb_dev usb_fstype
 
     if ! mountpoint -q "$USB_MOUNT"; then
-        log "Mounting USB at ${USB_MOUNT}..."
-        mount "$USB_MOUNT" || die "Failed to mount USB at ${USB_MOUNT}"
+        log "Mounting USB at ${USB_MOUNT} (up to ${USB_RETRY_ATTEMPTS} attempt(s))..."
+        retry "$USB_RETRY_ATTEMPTS" "$USB_RETRY_DELAY_SEC" mount "$USB_MOUNT" \
+            || die "Failed to mount USB at ${USB_MOUNT} after ${USB_RETRY_ATTEMPTS} attempts"
     fi
 
     usb_fstype=$(findmnt -n -o FSTYPE --target "$USB_MOUNT" 2>/dev/null || true)
@@ -286,8 +361,13 @@ validate_usb_target() {
     resolved_mount=$(realpath -m "$USB_MOUNT")
     resolved_target=$(realpath -m "$USB_RSYNC_TARGET")
 
+    # BUGFIX (v3.3.0): previously the success branch of this case statement
+    # did `return 0` immediately, which meant the mkdir auto-creation block
+    # below could never execute (confirmed dead code via ShellCheck SC2317).
+    # The case now only validates containment; directory creation always
+    # runs afterwards for the valid path.
     case "${resolved_target}/" in
-        "${resolved_mount}/"*) return 0 ;;
+        "${resolved_mount}/"*) ;;
         *)
             die "USB_RSYNC_TARGET (${USB_RSYNC_TARGET}) must be inside USB_MOUNT (${USB_MOUNT})"
             ;;
@@ -330,9 +410,13 @@ cloud_upload() {
         return 0
     fi
 
-    log "Uploading to cloud: ${CLOUD_REMOTE}..."
-    rclone copy "$BORG_REPO" "${CLOUD_REMOTE}/borg_repo" --progress \
-        || log "WARNING: Cloud upload failed. The backup is still available locally and on USB."
+    log "Uploading to cloud: ${CLOUD_REMOTE} (up to ${CLOUD_RETRY_ATTEMPTS} attempt(s))..."
+    if retry "$CLOUD_RETRY_ATTEMPTS" "$CLOUD_RETRY_DELAY_SEC" \
+        rclone copy "$BORG_REPO" "${CLOUD_REMOTE}/borg_repo" --progress; then
+        log "Cloud upload succeeded."
+    else
+        log "WARNING: Cloud upload failed after ${CLOUD_RETRY_ATTEMPTS} attempts. The backup is still available locally and on USB."
+    fi
 }
 
 # =============================================================================
@@ -506,6 +590,88 @@ check_repo() {
 }
 
 # =============================================================================
+# Scheduled consistency-check due-date tracking (borgmatic-style "checks")
+# A full `borg check` walks and verifies every object in the repository and
+# can be expensive on large repos. Rather than running it on every backup
+# (or relying purely on human memory), this tracks the last check timestamp
+# and only performs one when CHECK_INTERVAL_DAYS has elapsed. Intended to be
+# invoked frequently (e.g. daily, alongside the backup) via `check-if-due`.
+# =============================================================================
+check_if_due() {
+    local now last_check_ts age_days
+    now=$(date +%s)
+    if [[ -f "$CHECK_STATE_FILE" ]]; then
+        last_check_ts=$(cat "$CHECK_STATE_FILE" 2>/dev/null || echo 0)
+        [[ "$last_check_ts" =~ ^[0-9]+$ ]] || last_check_ts=0
+    else
+        last_check_ts=0
+    fi
+    age_days=$(( (now - last_check_ts) / 86400 ))
+
+    if (( age_days >= CHECK_INTERVAL_DAYS )); then
+        log "Repository check is due (last check ${age_days}d ago; interval ${CHECK_INTERVAL_DAYS}d). Running 'borg check'..."
+        check_repo
+        mkdir -p "$(dirname "$CHECK_STATE_FILE")"
+        echo "$now" > "$CHECK_STATE_FILE"
+        log "Repository check completed and recorded at ${CHECK_STATE_FILE}."
+    else
+        log "Repository check not due yet (last check ${age_days}d ago; interval ${CHECK_INTERVAL_DAYS}d). Skipping."
+    fi
+}
+
+# =============================================================================
+# Configuration validation — no side effects, safe to run at any time.
+# Mirrors borgmatic's `config validate` behaviour: verifies required
+# variables, checks the borg binary/version, and reports repository state
+# without touching it.
+# =============================================================================
+validate_configuration() {
+    local ok=1
+
+    echo "UKW_CONFIG:          ${UKW_CONFIG}"
+    echo "UKW_SECRETS:         ${UKW_SECRETS}"
+    echo "BORG_REPO:           ${BORG_REPO}"
+    echo "BACKUP_PATHS:        ${BACKUP_PATHS[*]}"
+    echo "EXCLUDE_DIRS:        ${EXCLUDE_DIRS[*]}"
+    echo "RETENTION_DAYS:      ${RETENTION_DAYS}"
+    echo "RETENTION_VERSIONS:  ${RETENTION_VERSIONS}"
+    echo "DB_TYPE:             ${DB_TYPE}"
+    echo "USB_RSYNC_TARGET:    ${USB_RSYNC_TARGET:-<none>}"
+    echo "CLOUD_REMOTE:        ${CLOUD_REMOTE:-<none>}"
+    echo "CHECK_INTERVAL_DAYS: ${CHECK_INTERVAL_DAYS}"
+    echo "MIN_BORG_VERSION:    ${MIN_BORG_VERSION}"
+
+    if command -v borg >/dev/null 2>&1; then
+        echo "borg version:        $(borg --version)"
+    else
+        echo "borg version:        NOT FOUND"
+        ok=0
+    fi
+
+    if [[ -d "$BORG_REPO" && -f "${BORG_REPO}/config" ]]; then
+        echo "Repository state:    exists at ${BORG_REPO}"
+    else
+        echo "Repository state:    does not exist yet (run: sudo $0 init)"
+    fi
+
+    case "$DB_TYPE" in
+        none|mysql|postgresql|mongodb) ;;
+        *)
+            echo "ERROR: DB_TYPE='${DB_TYPE}' is not one of none|mysql|postgresql|mongodb"
+            ok=0
+            ;;
+    esac
+
+    if (( ok )); then
+        echo "✅ Configuration valid."
+        return 0
+    else
+        echo "❌ Configuration has errors — see above."
+        return 1
+    fi
+}
+
+# =============================================================================
 # Repository existence check
 # =============================================================================
 ensure_repo_exists() {
@@ -521,11 +687,22 @@ ensure_repo_exists() {
 # Full backup cycle
 # =============================================================================
 run_backup() {
-    log "=== Starting UKwinika Enhanced Backup ==="
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        log "=== Starting UKwinika Enhanced Backup (DRY RUN) ==="
+    else
+        log "=== Starting UKwinika Enhanced Backup ==="
+    fi
+
     run_hook "$PRE_HOOK"
     local dump_path
     dump_path=$(db_dump)
     borg_backup "$dump_path"
+
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        log "=== DRY RUN complete — no changes made to the repository, USB, cloud, or metrics ==="
+        return 0
+    fi
+
     audit_verify_path_checksums
     sync_to_usb
     cloud_upload
@@ -539,10 +716,24 @@ run_backup() {
 # =============================================================================
 # CLI dispatch
 # =============================================================================
+# Config validation and the usage message shouldn't be gated on a working
+# borg binary/version; everything else should be.
+case "${1:-}" in
+    validate|"")
+        ;;
+    *)
+        check_borg_version
+        ;;
+esac
+
 case "${1:-}" in
     backup)
         ensure_repo_exists || die "Repository missing or invalid"
-        run_backup
+        if [[ "${2:-}" == "--dry-run" ]]; then
+            DRY_RUN=1 run_backup
+        else
+            run_backup
+        fi
         ;;
     restore)
         ensure_repo_exists || die "Repository missing or invalid"
@@ -555,6 +746,13 @@ case "${1:-}" in
     check)
         ensure_repo_exists || die "Repository missing or invalid"
         check_repo
+        ;;
+    check-if-due)
+        ensure_repo_exists || die "Repository missing or invalid"
+        check_if_due
+        ;;
+    validate)
+        validate_configuration
         ;;
     real-time)
         ensure_repo_exists || die "Repository missing or invalid"
@@ -572,7 +770,7 @@ case "${1:-}" in
         log "Repository initialised successfully at ${BORG_REPO}."
         ;;
     *)
-        echo "Usage: $0 {backup|restore <archive> [target]|list|check|real-time|init}"
+        echo "Usage: $0 {backup [--dry-run]|restore <archive> [target]|list|check|check-if-due|validate|real-time|init}"
         exit 1
         ;;
 esac
