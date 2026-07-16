@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Project Makefile – v3.2.2 (Idempotent Edition)
+# UKwinika Backup Project Makefile – v3.3.0 (Idempotent Edition)
 # Author: Urayayi Kwinika
 # Description: Handles installation, dependencies, and systemd deployment.
 # Supports Debian/Ubuntu and RHEL/Rocky/AlmaLinux/CentOS systems.
@@ -60,6 +60,7 @@ uninstall:
 # systemd – deploy all service units and logrotate configuration
 # ---------------------------------------------------------------------------
 systemd:
+	@sudo mkdir -p /var/lib/ukwinika
 	@sudo cp systemd/* $(SYSTEMD_DIR)/
 	@sudo cp backuprestore/ukwinika-restore-test.service $(SYSTEMD_DIR)/
 	@sudo cp backuprestore/ukwinika-restore-test.timer   $(SYSTEMD_DIR)/
@@ -75,6 +76,9 @@ systemd:
 	@echo ""
 	@echo "   Restore drill — enable the monthly timer:"
 	@echo "     sudo systemctl enable --now ukwinika-restore-test.timer"
+	@echo ""
+	@echo "   Consistency check — enable the daily due-date evaluation timer:"
+	@echo "     sudo systemctl enable --now ukwinika-check.timer"
 
 # ---------------------------------------------------------------------------
 # clean – remove runtime logs and restore drill directories
