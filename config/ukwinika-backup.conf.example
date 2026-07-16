@@ -1,5 +1,5 @@
 # =============================================================================
-# UKwinika Backup Configuration Example – v3.2.2 Idempotent Edition
+# UKwinika Backup Configuration Example – v3.3.0 Idempotent Edition
 # Copy to /etc/ukwinika-backup.conf and adjust.
 # STRICTLY no secrets in this file — all credentials go in ukwinika-backup.secrets.
 # Permissions: sudo chmod 600 /etc/ukwinika-backup.conf
@@ -7,6 +7,12 @@
 
 # ---------- Borg Repository Path (Primary Copy) -----------------------------
 BORG_REPO="/UKwinikaBackup/borg-repo"
+
+# ---------- Minimum Borg Version ---------------------------------------------
+# The script refuses to run if the installed `borg` binary is older than
+# this. Prevents subtly incompatible behaviour (e.g. --target support,
+# --dry-run flag support) on hosts with an outdated package.
+MIN_BORG_VERSION="1.2.0"
 
 # ---------- Paths to Back Up (Bash array) -----------------------------------
 # Default: entire root filesystem, minus the exclusions below.
@@ -39,10 +45,21 @@ USB_MOUNT="/mnt/backup_usb"
 USB_RSYNC_TARGET="/mnt/backup_usb/offsite-borg-repo"
 # Leave USB_RSYNC_TARGET empty to skip the secondary USB copy.
 
+# Retry/backoff for mounting the USB drive (handles slow-to-enumerate USB
+# controllers or transient udev delays; does not mask a genuinely absent drive).
+USB_RETRY_ATTEMPTS=3
+USB_RETRY_DELAY_SEC=5
+
 # ---------- Cloud Tertiary Copy (rclone) ------------------------------------
 # Set to a configured rclone remote + path, e.g. "s3:my-borg-backups"
 # Leave empty to skip the cloud upload.
 CLOUD_REMOTE=""
+
+# Retry/backoff for cloud upload (handles transient network blips without
+# failing the whole backup — the local and USB copies are already safe by
+# the time this step runs).
+CLOUD_RETRY_ATTEMPTS=3
+CLOUD_RETRY_DELAY_SEC=15
 
 # ---------- Database Dump ---------------------------------------------------
 # Supported values: none, mysql, postgresql, mongodb
@@ -116,3 +133,18 @@ RESTORE_KEEP_ON_FAILURE="yes"
 # Drill events are also tee'd to /var/log/UKwinikaBackup.log so the full
 # backup-and-verify lifecycle is visible in a single log stream.
 RESTORE_DRILL_LOG="/var/log/UKwinikaRestore.log"
+
+# =============================================================================
+# Scheduled Consistency Check (enhanced_automated_backups.sh check-if-due)
+# borgmatic-style due-date tracking: `borg check` walks and verifies every
+# object in the repository and can be expensive on large repos, so it is not
+# run on every backup. Instead, `check-if-due` (wired to ukwinika-check.timer,
+# which fires daily) only actually runs `borg check` once CHECK_INTERVAL_DAYS
+# has elapsed since the last recorded check.
+# =============================================================================
+
+# Path to the state file recording the Unix timestamp of the last check.
+CHECK_STATE_FILE="/var/lib/ukwinika/last-check-timestamp"
+
+# How many days between full repository consistency checks.
+CHECK_INTERVAL_DAYS=7
