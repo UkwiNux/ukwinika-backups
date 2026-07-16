@@ -1,0 +1,86 @@
+# =============================================================================
+# UKwinika Backup — Prometheus Alerting Rules
+#
+# These rules consume the metrics written by enhanced_automated_backups.sh
+# and ukwinika_automated_restore.sh to /var/lib/prometheus/node_exporter/custom/
+# ukwinika_backup.prom (scraped via the node_exporter textfile collector).
+#
+# Install: copy this file into your Prometheus rule_files directory (or
+# Alertmanager-compatible rule loader) and reference it from prometheus.yml:
+#
+#   rule_files:
+#     - /etc/prometheus/rules/ukwinika-backup-alerts.yml
+#
+# Then reload Prometheus: `curl -X POST http://localhost:9090/-/reload`
+# or `systemctl reload prometheus`.
+# =============================================================================
+groups:
+  - name: ukwinika_backup
+    rules:
+      - alert: UkwinikaBackupStale
+        expr: (time() - ukwinika_backup_last_success_seconds) > 60 * 60 * 30
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful UKwinika backup on {{ $labels.instance }} in over 30 hours"
+          description: >
+            The daily backup timer runs at 02:00 with up to 30 minutes of
+            jitter. If ukwinika_backup_last_success_seconds is more than 30
+            hours old, at least one scheduled backup has been missed or
+            failed silently. Check `journalctl -u ukwinika-backup.service`
+            and `/var/log/UKwinikaBackup.log` on {{ $labels.instance }}.
+
+      - alert: UkwinikaBackupMetricsMissing
+        expr: absent(ukwinika_backup_last_success_seconds)
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "UKwinika backup metrics missing on {{ $labels.instance }}"
+          description: >
+            No ukwinika_backup_last_success_seconds metric is being scraped
+            at all. Either the node_exporter textfile collector is
+            misconfigured, METRICS_ENABLED is set to "no", or the backup
+            script has never run successfully on this host.
+
+      - alert: UkwinikaRestoreDrillFailed
+        expr: ukwinika_restore_test_last_result == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "UKwinika restore drill FAILED on {{ $labels.instance }} (archive: {{ $labels.archive }})"
+          description: >
+            The most recent automated restore drill did not pass all
+            verification checks. See /var/log/UKwinikaRestore.log and the
+            audit log on {{ $labels.instance }} for details. Do not assume
+            backups are restorable until this is resolved.
+
+      - alert: UkwinikaRestoreDrillStale
+        expr: (time() - ukwinika_restore_test_last_run_seconds) > 60 * 60 * 24 * 45
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No UKwinika restore drill on {{ $labels.instance }} in over 45 days"
+          description: >
+            The monthly restore-drill timer fires on the 15th of each month.
+            If no drill has run in 45+ days, the timer may be disabled,
+            failing to start, or the host may have missed its scheduled run
+            (e.g. was powered off) without Persistent=true recovering it.
+            Check `systemctl status ukwinika-restore-test.timer`.
+
+      - alert: UkwinikaRestoreDrillChecksFailing
+        expr: ukwinika_restore_test_checks_failed > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} restore drill check(s) failing on {{ $labels.instance }}"
+          description: >
+            One or more of the six independent restore-drill verification
+            checks (non-empty extraction, mandatory paths, file count,
+            checksum spot-check, zero-byte detection, archive metadata) is
+            failing, even if the overall drill result has not yet flipped
+            to FAIL. Investigate before it does.
