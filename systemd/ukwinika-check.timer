@@ -1,0 +1,22 @@
+# UKwinika Scheduled Consistency Check Timer – v3.3.0
+# Installed by: sudo make systemd
+# Enable and start: sudo systemctl enable --now ukwinika-check.timer
+# Check next run:   systemctl list-timers ukwinika-check.timer
+#
+# Fires daily at 03:30 — but the service itself (check-if-due) is a no-op
+# on days when CHECK_INTERVAL_DAYS (default 7) hasn't elapsed since the
+# last check, so a full `borg check` still only runs on the configured
+# cadence, not every day. This mirrors borgmatic's "checks" frequency
+# feature: cheap to evaluate daily, expensive to actually run.
+
+[Unit]
+Description=Daily UKwinika Consistency-Check Due-Date Evaluation
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=20min
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

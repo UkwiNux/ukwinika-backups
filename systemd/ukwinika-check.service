@@ -1,0 +1,35 @@
+# UKwinika Scheduled Consistency Check Service – v3.3.0
+# Installed by: sudo make systemd
+# Triggered by: ukwinika-check.timer (daily; only runs `borg check` when
+#               CHECK_INTERVAL_DAYS has actually elapsed — borgmatic-style
+#               due-date tracking, avoiding an expensive full check on every
+#               invocation).
+# Run manually:  sudo systemctl start ukwinika-check.service
+
+[Unit]
+Description=UKwinika Scheduled Repository Consistency Check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+Environment="UKW_CONFIG=/etc/ukwinika-backup.conf"
+Environment="UKW_SECRETS=/etc/ukwinika-backup.secrets"
+
+ExecStart=/usr/local/bin/enhanced_automated_backups.sh check-if-due
+
+User=root
+
+# Full repository checks are I/O heavy; keep this at the lowest priority.
+Nice=19
+IOSchedulingClass=idle
+
+PrivateTmp=true
+
+# Harden: allow writes only to expected paths.
+# /var/lib/ukwinika holds the CHECK_STATE_FILE due-date marker.
+ProtectSystem=strict
+ReadWritePaths=/var/log /var/lock /var/lib/ukwinika /UKwinikaBackup /tmp
+ProtectHome=read-only
+NoNewPrivileges=true

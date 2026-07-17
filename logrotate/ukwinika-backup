@@ -1,5 +1,5 @@
 # /etc/logrotate.d/ukwinika-backup
-# UKwinika Backup Log Rotation – v3.2.2
+# UKwinika Backup Log Rotation – v3.3.0
 # Installed by: sudo make systemd
 # Rotates the main backup log, the audit log, and the restore drill log
 # daily, keeping 14 compressed copies of each.

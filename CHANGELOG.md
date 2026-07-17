@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v3.3.0] – 2026-07-16
 
 ### Fixed
-
 - **Dead-code bug in `validate_usb_target()`** — the success branch of the
   containment-check `case` statement previously `return`ed immediately,
   which meant the `mkdir -p "$USB_RSYNC_TARGET"` auto-creation block that
@@ -27,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rationale comment rather than silently ignored.
 
 ### Added
-
 - **Minimum Borg version enforcement** (`MIN_BORG_VERSION`, default `1.2.0`)
   — the script now refuses to run against an older, potentially
   incompatible `borg` binary instead of failing with a confusing error
@@ -67,7 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closing the "metrics exist but nothing alerts on them" gap.
 
 ### Changed
-
 - CI (`test.yml`) extended to test `validate`, `backup --dry-run` (asserting
   no archive is created), and `check-if-due` (asserting the second call
   within the same interval is skipped), plus presence/syntax checks for all

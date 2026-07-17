@@ -7,7 +7,8 @@ unsupported — please upgrade.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 3.2.x   | ✅ Current stable  |
+| 3.3.x   | ✅ Current stable  |
+| 3.2.x   | ⚠️ Upgrade recommended |
 | 3.1.x   | ⚠️ Security fixes only (until 2026-10-01) |
 | 3.0.x   | ❌ No longer supported |
 | < 3.0   | ❌ No longer supported |

@@ -62,7 +62,7 @@ To avoid wasted effort, please do not open pull requests for the following witho
 Before opening a bug report, please:
 
 1. Check the [existing issues](https://github.com/UkwiNux/ukwinika-backups/issues) to confirm the bug has not already been reported.
-2. Reproduce the issue on the **latest released version** (currently v3.2). Bugs in older versions will not be investigated unless they also affect the current release.
+2. Reproduce the issue on the **latest released version** (currently v3.3.0). Bugs in older versions will not be investigated unless they also affect the current release.
 3. Collect the relevant log output from `/var/log/UKwinikaBackup.log`.
 
 When opening a bug report, include all of the following:

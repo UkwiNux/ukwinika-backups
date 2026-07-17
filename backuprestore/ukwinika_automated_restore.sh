@@ -5,7 +5,7 @@
 # Version: 1.1
 # Project version: 3.3.0
 # Description:
-#   Automated monthly restore drill for UKwinika EABS v3.2.2 backups.
+#   Automated monthly restore drill for UKwinika EABS v3.3.0 backups.
 #   Implements the full verification workflow from docs/RESTORE-CHECKLIST.md
 #   without human interaction — suitable for scheduled execution via systemd.
 #
